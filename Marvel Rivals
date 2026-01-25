@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marvel Rivals Concept Clone</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #020205;
+            font-family: 'Rajdhani', sans-serif;
+            color: white;
+            user-select: none;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hero-card {
+            pointer-events: auto;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-card:hover {
+            transform: translateY(-15px) scale(1.02);
+            border-color: var(--hero-color);
+            box-shadow: 0 0 40px var(--hero-glow);
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .hero-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+            transition: 0.5s;
+        }
+
+        .hero-card:hover::before {
+            left: 100%;
+        }
+
+        .stat-bar {
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            width: 100%;
+            margin-top: 4px;
+            border-radius: 2px;
+        }
+
+        .stat-fill {
+            height: 100%;
+            background: var(--hero-color);
+            border-radius: 2px;
+        }
+
+        .hud-vignette {
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 200px rgba(0,0,0,0.9);
+            pointer-events: none;
+        }
+
+        .reticle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+        }
+
+        .reticle-cross {
+            position: absolute;
+            background: #fff;
+            opacity: 0.6;
+        }
+
+        .reticle-dot {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 4px;
+            background: #00f2ff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00f2ff;
+        }
+
+        .ability-btn {
+            width: 75px;
+            height: 75px;
+            background: rgba(5, 5, 10, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            pointer-events: auto;
+            cursor: pointer;
+            clip-path: polygon(10% 0%, 100% 0%, 90% 100%, 0% 100%);
+        }
+
+        .cooldown-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 242, 255, 0.3);
+            transition: height 0.1s linear;
+        }
+
+        #damage-flash {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle, rgba(255,0,0,0) 30%, rgba(255,0,0,0.4) 100%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .health-bar-container {
+            width: 450px;
+            height: 28px;
+            background: rgba(0,0,0,0.7);
+            transform: skewX(-25deg);
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 3px;
+        }
+
+        #health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0055, #ff4d00);
+            width: 100%;
+            transition: width 0.15s ease-out;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.5);
+        }
+
+        .damage-number {
+            position: absolute;
+            color: #fff;
+            font-weight: 900;
+            font-size: 32px;
+            pointer-events: none;
+            animation: float-up 0.5s ease-out forwards;
+            font-family: 'Orbitron';
+            -webkit-text-stroke: 1px black;
+        }
+
+        @keyframes float-up {
+            0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+            30% { transform: translate(-50%, -40px) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -100px) scale(1); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <!-- Character Selection -->
+        <div id="hero-selection" class="absolute inset-0 z-50 p-10 pointer-events-auto flex flex-col items-center justify-center bg-[#05050a] overflow-x-auto">
+            <div class="mb-8 text-center">
+                <h1 class="text-6xl font-black italic tracking-tighter text-white uppercase" style="font-family: 'Orbitron'">MARVEL RIVALS</h1>
+                <p class="text-blue-400 tracking-[0.4em] font-bold mt-2 uppercase">Hero Gallery Selection</p>
+            </div>
+
+            <div class="flex gap-6 max-w-full px-10">
+                <!-- VANGUARD: THOR -->
+                <div class="hero-card w-60 h-[400px] rounded-lg p-6 cursor-pointer flex flex-col justify-end" 
+                     style="--hero-color: #3b82f6; --hero-glow: rgba(59, 130, 246, 0.3)" onclick="startGame('vanguard')">
+                    <div class="absolute top-4 left-4 text-[10px] font-bold px-2 py-1 bg-blue-600 rounded">VANGUARD</div>
+                    <div class="text-2xl font-black uppercase mb-1 italic tracking-tighter" style="font-family: 'Orbitron'">Thor-Bot</div>
+                    <div class="mb-4 space-y-2">
+                        <div class="stat-bar"><div class="stat-fill" style="width: 90%"></div></div>
+                        <div class="stat-bar"><div class="stat-fill" style="width: 40%"></div></div>
+                    </div>
+                    <p class="text-[10px] opacity-50 leading-tight">Controls the battlefield with electric strikes.</p>
+                </div>
+
+                <!-- VANGUARD: VENOM -->
+                <div class="hero-card w-60 h-[400px] rounded-lg p-6 cursor-pointer flex flex-col justify-end" 
+                     style="--hero-color: #a855f7; --hero-glow: rgba(168, 85, 247, 0.3)" onclick="startGame('venom')">
+                    <div class="absolute top-4 left-4 text-[10px] font-bold px-2 py-1 bg-purple-600 rounded">VANGUARD</div>
+                    <div class="text-2xl font-black uppercase mb-1 italic tracking-tighter" style="font-family: 'Orbitron'">Venom-Bot</div>
+                    <div class="mb-4 space-y-2">
+                        <div class="stat-bar"><div class="stat-fill" style="width: 100%"></div></div>
+                        <div class="stat-bar"><div class="stat-fill" style="width: 30%"></div></div>
+                    </div>
+                    <p class="text-[10px] opacity-50 leading-tight">Extreme durability with heavy splash damage.</p>
+                </div>
+
+                <!-- DUELIST: PUNISHER -->
+                <div class="hero-card w-60 h-[400px] rounded-lg p-6 cursor-pointer flex flex-col justify-end" 
+                     style="--hero-color: #ef4444; --hero-glow: rgba(239, 68, 68, 0.3)" onclick="startGame('duelist')">
+                    <div class="absolute top-4 left-4 text-[10px] font-bold px-2 py-1 bg-red-600 rounded">DUELIST</div>
+                    <div class="text-2xl font-black uppercase mb-1 italic tracking-tighter" style="font-family: 'Orbitron'">Punisher-Bot</div>
+                    <div class="mb-4 space-y-2">
+                        <div class="stat-bar"><div class="stat-fill" style="width: 40%"></div></div>
+                        <div class="stat-bar"><div class="stat-fill" style="width: 85%"></div></div>
+                    </div>
+                    <p class="text-[10px] opacity-50 leading-tight">Rapid kinetic fire for sustained pressure.</p>
+                </div>
+
+                <!-- DUELIST: GHOST -->
+                <div class="hero-card w-60 h-[400px] rounded-lg p-6 cursor-pointer flex flex-col justify-end" 
+                     style="--hero-color: #f8fafc; --hero-glow: rgba(248, 250, 252, 0.3)" onclick="startGame('ghost')">
+                    <div class="absolute top-4 left-4 text-[10px] font-bold px-2 py-1 bg-gray-400 text-black rounded">DUELIST</div>
+                    <div class="text-2xl font-black uppercase mb-1 italic tracking-tighter" style="font-family: 'Orbitron'">Ghost-Bot</div>
+                    <div class="mb-4 space-y-2">
+                        <div class="stat-bar"><div class="stat-fill" style="width: 30%"></div></div>
+                        <div class="stat-bar"><div class="stat-fill" style="width: 100%"></div></div>
+                    </div>
+                    <p class="text-[10px] opacity-50 leading-tight">Surgical precision with deadly beam pulses.</p>
+                </div>
+
+                <!-- STRATEGIST: MANTIS -->
+                <div class="hero-card w-60 h-[400px] rounded-lg p-6 cursor-pointer flex flex-col justify-end" 
+                     style="--hero-color: #22c55e; --hero-glow: rgba(34, 197, 94, 0.3)" onclick="startGame('strategist')">
+                    <div class="absolute top-4 left-4 text-[10px] font-bold px-2 py-1 bg-green-600 rounded">STRATEGIST</div>
+                    <div class="text-2xl font-black uppercase mb-1 italic tracking-tighter" style="font-family: 'Orbitron'">Mantis-Bot</div>
+                    <div class="mb-4 space-y-2">
+                        <div class="stat-bar"><div class="stat-fill" style="width: 35%"></div></div>
+                        <div class="stat-bar"><div class="stat-fill" style="width: 65%"></div></div>
+                    </div>
+                    <p class="text-[10px] opacity-50 leading-tight">Support operative with bio-energy stars.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- In-Game HUD -->
+        <div id="game-hud" class="hidden absolute inset-0">
+            <div id="damage-flash"></div>
+            <div class="hud-vignette"></div>
+            <div class="reticle">
+                <div class="reticle-dot"></div>
+                <div class="reticle-cross w-[2px] h-3 top-[-10px] left-[50%] -translate-x-1/2"></div>
+                <div class="reticle-cross w-[2px] h-3 bottom-[-10px] left-[50%] -translate-x-1/2"></div>
+                <div class="reticle-cross w-3 h-[2px] left-[-10px] top-[50%] -translate-y-1/2"></div>
+                <div class="reticle-cross w-3 h-[2px] right-[-10px] top-[50%] -translate-y-1/2"></div>
+            </div>
+
+            <div class="absolute bottom-12 left-12 flex flex-col">
+                <div class="text-2xl font-black italic mb-1 uppercase tracking-widest text-white italic" id="player-name" style="font-family: 'Orbitron'">AGENT</div>
+                <div class="health-bar-container">
+                    <div id="health-fill"></div>
+                </div>
+            </div>
+
+            <div class="absolute bottom-12 right-12 flex gap-4 items-end">
+                <div class="ability-btn" onclick="triggerAbility('shift')">
+                    <span class="text-[10px] font-bold">SHIFT</span>
+                    <div class="cooldown-overlay" id="cd-1" style="height: 0%"></div>
+                </div>
+                <div class="ability-btn" onclick="triggerAbility('e')">
+                    <span class="text-[10px] font-bold italic">E</span>
+                    <div class="cooldown-overlay" id="cd-2" style="height: 0%"></div>
+                </div>
+                <div class="flex flex-col items-center">
+                    <div id="ult-ready" class="text-[10px] font-bold text-yellow-400 mb-1 opacity-0 transition-opacity">ULTIMATE READY</div>
+                    <div class="ability-btn rounded-full border-yellow-400 border-4 scale-125 mx-6" onclick="triggerAbility('ult')">
+                        <span class="text-sm font-black text-yellow-400">ULT</span>
+                        <div class="cooldown-overlay" id="cd-ult" style="height: 100%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const state = {
+            hero: 'vanguard',
+            health: 100,
+            maxHealth: 100,
+            bullets: [],
+            enemies: [],
+            lastShot: 0,
+            dashVelocity: 0,
+            cooldowns: { shift: 0, e: 0, ult: 30 },
+            isPaused: true,
+            move: { f: 0, b: 0, l: 0, r: 0 },
+            shake: 0
+        };
+
+        const HERO_DATA = {
+            vanguard: { 
+                health: 650, speed: 0.13, color: 0x3b82f6, name: "THOR-BOT", 
+                shotRate: 900, damage: 85, bulletSize: 0.7, type: 'electric' 
+            },
+            venom: {
+                health: 800, speed: 0.1, color: 0xa855f7, name: "VENOM-BOT",
+                shotRate: 1200, damage: 120, bulletSize: 1.2, type: 'venom'
+            },
+            duelist: { 
+                health: 250, speed: 0.23, color: 0xef4444, name: "PUNISHER-BOT", 
+                shotRate: 150, damage: 18, bulletSize: 0.15, type: 'kinetic' 
+            },
+            ghost: {
+                health: 200, speed: 0.28, color: 0xffffff, name: "GHOST-BOT",
+                shotRate: 600, damage: 95, bulletSize: 0.05, type: 'beam'
+            },
+            strategist: { 
+                health: 300, speed: 0.18, color: 0x22c55e, name: "MANTIS-BOT", 
+                shotRate: 300, damage: 35, bulletSize: 0.3, type: 'bio' 
+            }
+        };
+
+        let scene, camera, renderer, clock, player, playerModel, cameraPivot, muzzleLight;
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x020205);
+            scene.fog = new THREE.Fog(0x020205, 40, 200);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+            const cityLight = new THREE.PointLight(0x00f2ff, 0.6, 500);
+            cityLight.position.set(0, 50, 0);
+            scene.add(cityLight);
+
+            muzzleLight = new THREE.PointLight(0xffffff, 0, 15);
+            scene.add(muzzleLight);
+
+            // Detailed Map Elements
+            createArena();
+
+            // Player Setup
+            player = new THREE.Group();
+            scene.add(player);
+
+            cameraPivot = new THREE.Group();
+            player.add(cameraPivot);
+            camera.position.set(1.8, 2.5, 7);
+            camera.lookAt(0, 1.5, -5);
+            cameraPivot.add(camera);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function createArena() {
+            // Textured Floor
+            const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+            const floorMat = new THREE.MeshStandardMaterial({ 
+                color: 0x05050a, 
+                roughness: 0.9,
+                metalness: 0.2
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // City Grid
+            const grid = new THREE.GridHelper(1000, 80, 0x1a1a3a, 0x0a0a1a);
+            grid.position.y = 0.05;
+            scene.add(grid);
+
+            // Arena Obstacles
+            const addBuilding = (x, z, w, h, d, color = 0x11111a) => {
+                const b = new THREE.Mesh(
+                    new THREE.BoxGeometry(w, h, d),
+                    new THREE.MeshStandardMaterial({ color: color, roughness: 0.5 })
+                );
+                b.position.set(x, h/2, z);
+                b.castShadow = true;
+                b.receiveShadow = true;
+                scene.add(b);
+
+                // Neon trim
+                const trim = new THREE.Mesh(
+                    new THREE.BoxGeometry(w+0.1, 0.2, d+0.1),
+                    new THREE.MeshBasicMaterial({ color: 0x00f2ff })
+                );
+                trim.position.set(x, h-0.1, z);
+                scene.add(trim);
+            };
+
+            // Layout
+            for(let i=0; i<30; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 50 + Math.random() * 100;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius;
+                addBuilding(x, z, 8, 10 + Math.random()*40, 8);
+            }
+
+            // Central Combat Zone Pillars
+            for(let i=0; i<8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const x = Math.cos(angle) * 30;
+                const z = Math.sin(angle) * 30;
+                addBuilding(x, z, 4, 15, 4, 0x222233);
+            }
+        }
+
+        function createCapsule(radius, height, color) {
+            const group = new THREE.Group();
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: color, 
+                emissive: color, 
+                emissiveIntensity: 0.4,
+                roughness: 0.3,
+                metalness: 0.5
+            });
+            const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height - radius*2, 16), mat);
+            group.add(cylinder);
+            const sphere = new THREE.SphereGeometry(radius, 16, 16);
+            const top = new THREE.Mesh(sphere, mat); top.position.y = (height/2)-radius; group.add(top);
+            const bot = new THREE.Mesh(sphere, mat); bot.position.y = -(height/2)+radius; group.add(bot);
+            
+            const visor = new THREE.Mesh(
+                new THREE.BoxGeometry(radius*1.2, 0.15, radius*1.1),
+                new THREE.MeshBasicMaterial({ color: 0xffffff })
+            );
+            visor.position.set(0, height/2 - 0.4, radius/1.5);
+            group.add(visor);
+
+            return group;
+        }
+
+        function startGame(heroType) {
+            state.hero = heroType;
+            state.health = HERO_DATA[heroType].health;
+            state.maxHealth = HERO_DATA[heroType].health;
+            state.isPaused = false;
+
+            document.getElementById('hero-selection').style.display = 'none';
+            document.getElementById('game-hud').classList.remove('hidden');
+            document.getElementById('player-name').innerText = HERO_DATA[heroType].name;
+
+            if(playerModel) player.remove(playerModel);
+            playerModel = createCapsule(0.6, 1.8, HERO_DATA[heroType].color);
+            playerModel.position.y = 0.9;
+            player.add(playerModel);
+
+            document.body.requestPointerLock();
+            for(let i=0; i<12; i++) spawnEnemy();
+            
+            updateHealthUI();
+            animate();
+        }
+
+        function spawnEnemy() {
+            const enemy = createCapsule(0.5, 2, 0xff0055);
+            enemy.position.set(Math.random()*160-80, 1, Math.random()*160-80);
+            if(enemy.position.distanceTo(player.position) < 20) enemy.position.z -= 40;
+            enemy.userData = { health: 220, lastHit: 0, hitTimer: 0 };
+            scene.add(enemy);
+            state.enemies.push(enemy);
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if(document.pointerLockElement !== document.body) return;
+            player.rotation.y -= e.movementX * 0.0025;
+            cameraPivot.rotation.x -= e.movementY * 0.0025;
+            cameraPivot.rotation.x = Math.max(-0.6, Math.min(0.6, cameraPivot.rotation.x));
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if(state.isPaused) return;
+            if(e.code === 'KeyW') state.move.f = 1;
+            if(e.code === 'KeyS') state.move.b = 1;
+            if(e.code === 'KeyA') state.move.l = 1;
+            if(e.code === 'KeyD') state.move.r = 1;
+            if(e.code === 'ShiftLeft') triggerAbility('shift');
+            if(e.code === 'KeyE') triggerAbility('e');
+            if(e.code === 'KeyQ') triggerAbility('ult');
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if(e.code === 'KeyW') state.move.f = 0;
+            if(e.code === 'KeyS') state.move.b = 0;
+            if(e.code === 'KeyA') state.move.l = 0;
+            if(e.code === 'KeyD') state.move.r = 0;
+        });
+
+        document.addEventListener('mousedown', () => { if(!state.isPaused) shoot(); });
+
+        function triggerAbility(type) {
+            if(state.cooldowns[type] > 0) return;
+            
+            if(type === 'shift') {
+                state.dashVelocity = HERO_DATA[state.hero].speed * 15;
+                state.cooldowns.shift = 6;
+            } else if(type === 'e') {
+                state.cooldowns.e = 8;
+                const color = HERO_DATA[state.hero].color;
+                const blast = new THREE.Mesh(
+                    new THREE.SphereGeometry(1, 16, 16),
+                    new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5 })
+                );
+                blast.position.copy(player.position);
+                scene.add(blast);
+                let sc = 1;
+                const anim = () => {
+                    sc += 2;
+                    blast.scale.set(sc, sc, sc);
+                    blast.material.opacity *= 0.8;
+                    if(blast.material.opacity > 0.01) requestAnimationFrame(anim);
+                    else scene.remove(blast);
+                };
+                anim();
+                state.enemies.forEach(en => {
+                    if(en.position.distanceTo(player.position) < 20) damageEnemy(en, 110);
+                });
+            } else if (type === 'ult') {
+                state.cooldowns.ult = 50;
+                state.shake = 1.5;
+                state.enemies.forEach(en => {
+                    if(en.position.distanceTo(player.position) < 40) damageEnemy(en, 350);
+                });
+            }
+        }
+
+        function shoot() {
+            const h = HERO_DATA[state.hero];
+            const now = Date.now();
+            if(now - state.lastShot < h.shotRate) return;
+            state.lastShot = now;
+
+            let geo, mat, speed = 2.8;
+            if(h.type === 'electric') {
+                geo = new THREE.SphereGeometry(h.bulletSize, 8, 8);
+                mat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
+            } else if(h.type === 'venom') {
+                geo = new THREE.IcosahedronGeometry(h.bulletSize, 0);
+                mat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
+                speed = 1.8;
+            } else if(h.type === 'kinetic') {
+                geo = new THREE.CylinderGeometry(0.05, 0.05, h.bulletSize*3, 4);
+                mat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                speed = 3.5;
+            } else if(h.type === 'beam') {
+                geo = new THREE.BoxGeometry(0.05, 0.05, 4);
+                mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                speed = 6.0;
+            } else {
+                geo = new THREE.OctahedronGeometry(h.bulletSize, 0);
+                mat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+            }
+
+            const bullet = new THREE.Mesh(geo, mat);
+            const dir = new THREE.Vector3(0, 0, -1);
+            dir.applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion()));
+            bullet.quaternion.copy(camera.getWorldQuaternion(new THREE.Quaternion()));
+            
+            bullet.position.copy(player.position).add(new THREE.Vector3(0, 1.5, 0));
+            bullet.userData = { 
+                velocity: dir.multiplyScalar(speed), 
+                life: 100, 
+                damage: h.damage,
+                type: h.type
+            };
+            
+            muzzleLight.color.setHex(h.color);
+            muzzleLight.intensity = 2.5;
+            muzzleLight.position.copy(bullet.position);
+            setTimeout(() => muzzleLight.intensity = 0, 40);
+
+            scene.add(bullet);
+            state.bullets.push(bullet);
+            state.shake = h.damage / 400;
+        }
+
+        function damageEnemy(enemy, amount) {
+            enemy.userData.health -= amount;
+            enemy.userData.hitTimer = 6;
+            
+            const vector = enemy.position.clone().project(camera);
+            const div = document.createElement('div');
+            div.className = 'damage-number';
+            div.style.left = `${(vector.x + 1) / 2 * window.innerWidth}px`;
+            div.style.top = `${-(vector.y - 1) / 2 * window.innerHeight}px`;
+            div.innerText = amount;
+            document.getElementById('ui-layer').appendChild(div);
+            setTimeout(() => div.remove(), 500);
+
+            if(enemy.userData.health <= 0) {
+                scene.remove(enemy);
+                state.enemies.splice(state.enemies.indexOf(enemy), 1);
+                setTimeout(spawnEnemy, 2500);
+            }
+        }
+
+        function updateHealthUI() {
+            document.getElementById('health-fill').style.width = `${(state.health / state.maxHealth) * 100}%`;
+        }
+
+        function animate() {
+            if(state.isPaused) return;
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+
+            const dir = new THREE.Vector3();
+            if(state.move.f) dir.z -= 1; if(state.move.b) dir.z += 1;
+            if(state.move.l) dir.x -= 1; if(state.move.r) dir.x += 1;
+            dir.normalize().applyQuaternion(player.quaternion);
+            
+            let s = HERO_DATA[state.hero].speed;
+            if(state.dashVelocity > 0) { s += state.dashVelocity; state.dashVelocity *= 0.85; }
+            player.position.add(dir.multiplyScalar(s));
+
+            // Camera Shake
+            if(state.shake > 0) {
+                camera.position.x += (Math.random()-0.5) * state.shake;
+                camera.position.y += (Math.random()-0.5) * state.shake;
+                state.shake *= 0.85;
+            } else {
+                camera.position.set(1.8, 2.5, 7);
+            }
+
+            // Bullet Logic
+            for(let i=state.bullets.length-1; i>=0; i--) {
+                const b = state.bullets[i];
+                b.position.add(b.userData.velocity);
+                b.userData.life--;
+                
+                state.enemies.forEach(en => {
+                    if(en.position.distanceTo(b.position) < (b.userData.type === 'venom' ? 2.5 : 1.8)) {
+                        damageEnemy(en, b.userData.damage);
+                        b.userData.life = 0;
+                    }
+                });
+                if(b.userData.life <= 0) { scene.remove(b); state.bullets.splice(i,1); }
+            }
+
+            // Enemy AI
+            state.enemies.forEach(en => {
+                const dist = en.position.distanceTo(player.position);
+                if(dist < 60) {
+                    en.position.add(player.position.clone().sub(en.position).normalize().multiplyScalar(0.09));
+                    if(dist < 3 && Date.now() - en.userData.lastHit > 1500) {
+                        state.health -= 45;
+                        en.userData.lastHit = Date.now();
+                        updateHealthUI();
+                        document.getElementById('damage-flash').style.opacity = '1';
+                        setTimeout(() => document.getElementById('damage-flash').style.opacity = '0', 100);
+                        state.shake = 0.4;
+                    }
+                }
+                if(en.userData.hitTimer > 0) {
+                    en.children.forEach(c => c.material.emissiveIntensity = 3);
+                    en.userData.hitTimer--;
+                } else {
+                    en.children.forEach(c => c.material.emissiveIntensity = 0.4);
+                }
+            });
+
+            // Cooldowns
+            Object.keys(state.cooldowns).forEach(k => {
+                if(state.cooldowns[k] > 0) {
+                    state.cooldowns[k] -= dt;
+                    const id = k==='ult' ? 'cd-ult' : (k==='shift' ? 'cd-1' : 'cd-2');
+                    const max = k==='ult' ? 50 : (k==='shift' ? 6 : 8);
+                    document.getElementById(id).style.height = `${(state.cooldowns[k]/max)*100}%`;
+                }
+            });
+            document.getElementById('ult-ready').style.opacity = state.cooldowns.ult <= 0 ? '1' : '0';
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = init3D;
+    </script>
+</body>
+</html>
