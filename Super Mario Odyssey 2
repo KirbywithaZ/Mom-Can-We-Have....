@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Mario Odyssey - Web Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; }
+        
+        /* GUI Styling */
+        #gui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.5);
+            pointer-events: none;
+            z-index: 10;
+        }
+        .stat-row { display: flex; align-items: center; margin-bottom: 5px; }
+        .stat-icon { font-size: 32px; margin-right: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+        .stat-text { font-size: 42px; font-weight: 900; font-style: italic; -webkit-text-stroke: 1.5px black; }
+        
+        /* Premium Title Screen */
+        #overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #ff4081 0%, #c2185b 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+            transition: opacity 0.5s ease;
+        }
+        #overlay h1 {
+            font-size: 80px;
+            margin: 0;
+            letter-spacing: -4px;
+            text-transform: uppercase;
+            text-shadow: 0 10px 0 #880e4f, 0 15px 30px rgba(0,0,0,0.5);
+            transform: skew(-5deg);
+        }
+        .start-prompt {
+            font-size: 24px;
+            margin-top: 20px;
+            animation: pulse 1.5s infinite;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.05); }
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .capture-label {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #ffeb3b;
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: 900;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            display: none;
+            text-transform: uppercase;
+            border: 3px solid black;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="overlay">
+        <h1>Odyssey</h1>
+        <div style="font-size: 24px; font-weight: bold; background: white; color: #c2185b; padding: 5px 20px; border-radius: 5px; transform: rotate(-2deg);">WEB EDITION</div>
+        <p class="start-prompt">Press to Start</p>
+        <div style="margin-top: 40px; font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6;">
+            <b>ARROWS</b>: Move | <b>SPACE</b>: Jump | <b>E</b>: Throw Cappy<br>
+            <b>CAP JUMP</b>: Throw Cappy, then jump into him!
+        </div>
+    </div>
+
+    <div id="gui-container">
+        <div class="stat-row">
+            <span class="stat-icon">🌙</span>
+            <span class="stat-text" id="moon-count">0</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-icon">🪙</span>
+            <span class="stat-text" id="coin-count" style="font-size: 28px; color: #ffeb3b;">0</span>
+        </div>
+    </div>
+
+    <div id="capture-ui" class="capture-label">Captured: Goomba (Q to Release)</div>
+
+    <div id="instructions">
+        ARROWS to Move | SPACE to Jump | E to Throw Cappy
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const CONFIG = {
+            gravity: -0.015,
+            marioJump: 0.38,
+            goombaJump: 0.25,
+            marioSpeed: 0.18,
+            goombaSpeed: 0.1,
+            cappySpeed: 0.7,
+            cappyRange: 13,
+            capJumpBoost: 0.48,
+            cappyStayDuration: 80 // Increased for easier Cap Jumps
+        };
+
+        // --- GLOBALS ---
+        let scene, camera, renderer, clock;
+        let player, cappy, currentCapture = null;
+        let keys = {};
+        let moons = [], coins = [], platforms = [], enemies = [];
+        let moonCollected = 0, coinCollected = 0;
+        let isJumping = false, velocityY = 0;
+        let isCappyOut = false, yaw = 0, pitch = -0.2, gameActive = false;
+        let capJumpAvailable = false;
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfbb03b); // Sunset Orange
+            scene.fog = new THREE.Fog(0xfbb03b, 50, 200);
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            setupLights();
+            createEnvironment();
+            createPlayer();
+            createCappy();
+            spawnEnemies();
+            spawnCollectibles();
+
+            // Inputs (ARROWS + WASD Support)
+            window.addEventListener('keydown', e => {
+                keys[e.code] = true;
+                if(e.code === 'KeyE' && gameActive) handleAction();
+                if(e.code === 'KeyQ' && currentCapture) releaseCapture();
+            });
+            window.addEventListener('keyup', e => keys[e.code] = false);
+            
+            document.getElementById('overlay').addEventListener('click', () => {
+                document.body.requestPointerLock();
+            });
+
+            document.addEventListener('pointerlockchange', () => {
+                gameActive = (document.pointerLockElement === document.body);
+                document.getElementById('overlay').style.opacity = gameActive ? '0' : '1';
+                document.getElementById('overlay').style.pointerEvents = gameActive ? 'none' : 'auto';
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (gameActive) {
+                    yaw -= e.movementX * 0.0025;
+                    pitch -= e.movementY * 0.0025;
+                    pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/6, pitch));
+                }
+            });
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function setupLights() {
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+            sun.position.set(100, 100, 50);
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(2048, 2048);
+            sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
+            sun.shadow.camera.top = 150; sun.shadow.camera.bottom = -150;
+            scene.add(sun);
+        }
+
+        function createEnvironment() {
+            // Textured Sand Ground
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(800, 800),
+                new THREE.MeshPhongMaterial({ color: 0xedc9af })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+            platforms.push(ground);
+
+            // Detailed Ruins - More complexity
+            // Main Plaza
+            addStructure(40, 1, 40, 0, 0.5, -40, 0xd2b48c); 
+            
+            // Central Palace Structure
+            addStructure(20, 15, 20, 0, 7.5, -40, 0x8b7355); 
+            addStructure(15, 20, 15, 0, 10, -40, 0xa08260); 
+            addStructure(8, 30, 8, 0, 15, -40, 0xcdad00); // The spire
+            
+            // Floating ruins leading higher
+            addStructure(6, 1, 6, -20, 12, -40, 0x8b4513);
+            addStructure(6, 1, 6, -30, 18, -20, 0x8b4513);
+            addStructure(10, 1, 10, 0, 25, -10, 0x8b4513);
+
+            // Columns and Walls
+            for(let i=0; i<8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const r = 35;
+                addStructure(3, 12, 3, Math.cos(angle)*r, 6, Math.sin(angle)*r - 40, 0x8b7355);
+            }
+
+            // High Moon Platform
+            addStructure(5, 0.5, 5, 50, 15, -10, 0xcdad00);
+        }
+
+        function addStructure(w, h, d, x, y, z, col) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(w, h, d),
+                new THREE.MeshPhongMaterial({ color: col })
+            );
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            scene.add(mesh);
+            platforms.push(mesh);
+        }
+
+        function createPlayer() {
+            if(player) scene.remove(player);
+            player = new THREE.Group();
+            
+            if(currentCapture === 'goomba') {
+                const gBody = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), new THREE.MeshPhongMaterial({color: 0x8b4513}));
+                gBody.position.y = 0.7;
+                player.add(gBody);
+                const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), new THREE.MeshPhongMaterial({color: 0xff0000}));
+                hat.position.y = 1.4;
+                player.add(hat);
+            } else {
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 12), new THREE.MeshPhongMaterial({color: 0xff0000}));
+                body.position.y = 0.8;
+                player.add(body);
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 12), new THREE.MeshPhongMaterial({color: 0xffdbac}));
+                head.position.y = 1.4;
+                player.add(head);
+                const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), new THREE.MeshPhongMaterial({color: 0xff0000}));
+                hat.position.y = 1.65;
+                hat.name = "mario_hat";
+                player.add(hat);
+            }
+            scene.add(player);
+        }
+
+        function createCappy() {
+            cappy = new THREE.Group();
+            const hatBase = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.18, 16), new THREE.MeshPhongMaterial({ color: 0xff0000 }));
+            cappy.add(hatBase);
+            const eyeGeo = new THREE.SphereGeometry(0.09, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const eL = new THREE.Mesh(eyeGeo, eyeMat); eL.position.set(0.15, 0.05, 0.35);
+            const eR = eL.clone(); eR.position.set(-0.15, 0.05, 0.35);
+            cappy.add(eL, eR);
+            cappy.visible = false;
+            scene.add(cappy);
+        }
+
+        function spawnEnemies() {
+            const locations = [[15, 1, -15], [-15, 1, 20], [0, 11, -30], [20, 1, -60]];
+            locations.forEach(loc => {
+                const goomba = new THREE.Group();
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 10), new THREE.MeshPhongMaterial({color: 0x8b4513}));
+                body.position.y = 0.7;
+                goomba.add(body);
+                goomba.position.set(...loc);
+                goomba.userData = { type: 'goomba' };
+                scene.add(goomba);
+                enemies.push(goomba);
+            });
+        }
+
+        function spawnCollectibles() {
+            const moonGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.15, 16);
+            const moonMat = new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0x666600 });
+            
+            [[0, 31, -40], [50, 16.5, -10], [-40, 1, 20]].forEach(p => {
+                const m = new THREE.Mesh(moonGeo, moonMat);
+                m.position.set(...p);
+                m.rotation.z = Math.PI/2;
+                scene.add(m); moons.push(m);
+            });
+
+            for(let i=0; i<40; i++) {
+                const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.05, 12), new THREE.MeshPhongMaterial({color: 0xffd700}));
+                coin.position.set(Math.random()*200-100, 0.5, Math.random()*200-100);
+                coin.rotation.z = Math.PI/2;
+                scene.add(coin); coins.push(coin);
+            }
+        }
+
+        function handleAction() {
+            if (!isCappyOut && !currentCapture) {
+                throwCappy();
+            }
+        }
+
+        function throwCappy() {
+            isCappyOut = true;
+            cappy.visible = true;
+            capJumpAvailable = true;
+            cappy.position.copy(player.position).add(new THREE.Vector3(0, 1.4, 0));
+            
+            const forward = new THREE.Vector3(0,0,1).applyQuaternion(player.quaternion);
+            cappy.userData = { 
+                dir: forward, 
+                dist: 0, 
+                returning: false, 
+                stayTime: CONFIG.cappyStayDuration 
+            };
+            
+            const mHat = player.getObjectByName("mario_hat");
+            if(mHat) mHat.visible = false;
+        }
+
+        function captureEnemy(enemy) {
+            currentCapture = enemy.userData.type;
+            const pos = enemy.position.clone();
+            scene.remove(enemy);
+            enemies = enemies.filter(e => e !== enemy);
+            createPlayer();
+            player.position.copy(pos);
+            velocityY = 0.2;
+            isCappyOut = false;
+            cappy.visible = false;
+            document.getElementById('capture-ui').style.display = 'block';
+        }
+
+        function releaseCapture() {
+            const pos = player.position.clone();
+            currentCapture = null;
+            createPlayer();
+            player.position.copy(pos);
+            player.position.y += 2;
+            velocityY = 0.3;
+            document.getElementById('capture-ui').style.display = 'none';
+        }
+
+        function update() {
+            if (!gameActive) return;
+
+            // Camera
+            const camDir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+            const camTarget = player.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+            camera.position.copy(camTarget).sub(camDir.clone().multiplyScalar(12));
+            camera.lookAt(camTarget);
+
+            // Movement (Arrows + WASD)
+            const moveDir = new THREE.Vector3();
+            if (keys['ArrowUp'] || keys['KeyW']) moveDir.z += 1;
+            if (keys['ArrowDown'] || keys['KeyS']) moveDir.z -= 1;
+            if (keys['ArrowLeft'] || keys['KeyA']) moveDir.x += 1;
+            if (keys['ArrowRight'] || keys['KeyD']) moveDir.x -= 1;
+
+            const speed = currentCapture === 'goomba' ? CONFIG.goombaSpeed : CONFIG.marioSpeed;
+
+            if (moveDir.length() > 0) {
+                moveDir.normalize();
+                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                const finalDir = new THREE.Vector3().addScaledVector(forward, moveDir.z).addScaledVector(right, moveDir.x).normalize();
+                player.position.addScaledVector(finalDir, speed);
+                player.rotation.y = Math.atan2(finalDir.x, finalDir.z);
+            }
+
+            // Jump
+            if (keys['Space'] && !isJumping) {
+                isJumping = true;
+                velocityY = currentCapture === 'goomba' ? CONFIG.goombaJump : CONFIG.marioJump;
+            }
+
+            // Cappy Logic
+            if (isCappyOut) {
+                cappy.rotation.y += 0.4;
+                if (!cappy.userData.returning) {
+                    cappy.position.addScaledVector(cappy.userData.dir, CONFIG.cappySpeed);
+                    cappy.userData.dist += CONFIG.cappySpeed;
+                    enemies.forEach(e => {
+                        if (cappy.position.distanceTo(e.position.clone().add(new THREE.Vector3(0,0.7,0))) < 1.8) {
+                            captureEnemy(e);
+                        }
+                    });
+                    if (cappy.userData.dist > CONFIG.cappyRange) cappy.userData.returning = true;
+                } else {
+                    if (cappy.userData.stayTime > 0) {
+                        cappy.userData.stayTime--;
+                        // Cap Jump
+                        if (capJumpAvailable && player.position.distanceTo(cappy.position) < 2.0 && velocityY < 0.1) {
+                            velocityY = CONFIG.capJumpBoost;
+                            capJumpAvailable = false;
+                            cappy.userData.stayTime = 0; 
+                        }
+                    } else {
+                        const toPlayer = player.position.clone().add(new THREE.Vector3(0, 1.4, 0)).sub(cappy.position);
+                        if (toPlayer.length() < 1.2) { 
+                            isCappyOut = false; 
+                            cappy.visible = false; 
+                            const mHat = player.getObjectByName("mario_hat");
+                            if(mHat) mHat.visible = true;
+                        } else {
+                            cappy.position.addScaledVector(toPlayer.normalize(), CONFIG.cappySpeed * 1.3);
+                        }
+                    }
+                }
+            }
+
+            // Gravity & Collision
+            velocityY += CONFIG.gravity;
+            player.position.y += velocityY;
+
+            let onGround = false;
+            platforms.forEach(plat => {
+                const box = new THREE.Box3().setFromObject(plat);
+                const pBox = new THREE.Box3().setFromCenterAndSize(player.position.clone().add(new THREE.Vector3(0,0.8,0)), new THREE.Vector3(1.2,1.6,1.2));
+                if (box.intersectsBox(pBox)) {
+                    if (velocityY < 0 && player.position.y >= box.max.y - 0.7) {
+                        player.position.y = box.max.y;
+                        velocityY = 0;
+                        isJumping = false;
+                        onGround = true;
+                        capJumpAvailable = true;
+                    }
+                }
+            });
+
+            if (player.position.y < -20) { player.position.set(0, 5, 0); velocityY = 0; }
+
+            // Collectibles
+            moons.forEach(m => {
+                if (m.visible) {
+                    m.rotation.y += 0.05;
+                    if (player.position.distanceTo(m.position) < 2.2) {
+                        m.visible = false;
+                        moonCollected++;
+                        document.getElementById('moon-count').innerText = moonCollected;
+                    }
+                }
+            });
+            coins.forEach(c => {
+                if (c.visible) {
+                    c.rotation.y += 0.1;
+                    if (player.position.distanceTo(c.position) < 1.5) {
+                        c.visible = false;
+                        coinCollected++;
+                        document.getElementById('coin-count').innerText = coinCollected;
+                    }
+                }
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
