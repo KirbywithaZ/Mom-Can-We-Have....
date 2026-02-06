@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Mario Odyssey</title>
+    <title>Super Mario Odyssey - Web Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; }
         
-        /* GUI Styling */
         #gui-container {
             position: absolute;
             top: 20px;
@@ -22,7 +21,6 @@
         .stat-icon { font-size: 32px; margin-right: 12px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
         .stat-text { font-size: 42px; font-weight: 900; font-style: italic; -webkit-text-stroke: 1.5px black; }
         
-        /* Premium Title Screen */
         #overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -97,8 +95,8 @@
         <div style="font-size: 24px; font-weight: bold; background: white; color: #c2185b; padding: 5px 20px; border-radius: 5px; transform: rotate(-2deg);">WEB EDITION</div>
         <p class="start-prompt">Press to Start</p>
         <div style="margin-top: 40px; font-size: 14px; color: rgba(255,255,255,0.8); line-height: 1.6;">
-            <b>ARROWS</b>: Move | <b>SPACE</b>: Jump | <b>E</b>: Throw Cappy<br>
-            <b>CAP JUMP</b>: Throw Cappy, then jump into him!
+            <b>ARROWS</b>: Move | <b>SPACE</b>: Jump | <b>SHIFT</b>: Dash<br>
+            <b>E</b>: Throw Cappy | <b>GOOMBA STACK</b>: Jump on other Goombas!
         </div>
     </div>
 
@@ -113,10 +111,10 @@
         </div>
     </div>
 
-    <div id="capture-ui" class="capture-label">Captured: Goomba (Q to Release)</div>
+    <div id="capture-ui" class="capture-label">Captured: Goomba Stack (Q to Release)</div>
 
     <div id="instructions">
-        ARROWS to Move | SPACE to Jump | E to Throw Cappy
+        ARROWS to Move | SPACE to Jump | SHIFT to Dash | E to Throw | Q to Release
     </div>
 
     <script>
@@ -125,28 +123,92 @@
             gravity: -0.015,
             marioJump: 0.38,
             goombaJump: 0.25,
-            marioSpeed: 0.18,
-            goombaSpeed: 0.1,
-            cappySpeed: 0.7,
+            marioSpeed: 0.2,
+            goombaSpeed: 0.12,
+            dashPower: 0.6,
+            dashDecay: 0.9,
+            cappySpeed: 0.75,
             cappyRange: 13,
-            capJumpBoost: 0.48,
-            cappyStayDuration: 80 // Increased for easier Cap Jumps
+            capJumpBoost: 0.52, 
+            cappyStayDuration: 90 
         };
 
         // --- GLOBALS ---
         let scene, camera, renderer, clock;
         let player, cappy, currentCapture = null;
+        let goombaStackCount = 1;
         let keys = {};
         let moons = [], coins = [], platforms = [], enemies = [];
         let moonCollected = 0, coinCollected = 0;
         let isJumping = false, velocityY = 0;
         let isCappyOut = false, yaw = 0, pitch = -0.2, gameActive = false;
         let capJumpAvailable = false;
+        let dashVelocity = new THREE.Vector3();
+
+        // --- CUSTOM SHADER MATERIAL FOR SAND ---
+        // Creating a custom shader that generates noise-based grain for the desert look
+        const sandShader = {
+            uniforms: THREE.UniformsUtils.merge([
+                THREE.UniformsLib['lights'],
+                {
+                    color: { value: new THREE.Color(0xedc9af) },
+                    time: { value: 0.0 }
+                }
+            ]),
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPosition.xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 color;
+                uniform float time;
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+
+                float hash(vec3 p) {
+                    p = fract(p * 0.3183099 + 0.1);
+                    p *= 17.0;
+                    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+                }
+
+                void main() {
+                    // Generate grain based on world position
+                    float grain = hash(floor(vWorldPosition * 25.0));
+                    vec3 finalColor = color;
+                    
+                    // Add light/dark specks
+                    finalColor += (grain - 0.5) * 0.12;
+                    
+                    // Simple lighting calculation
+                    vec3 lightDir = normalize(vec3(50.0, 100.0, 50.0));
+                    float diff = max(dot(vNormal, lightDir), 0.0);
+                    
+                    gl_FragColor = vec4(finalColor * (diff * 0.6 + 0.5), 1.0);
+                }
+            `
+        };
+
+        function getSandMaterial(baseColor) {
+            const material = new THREE.ShaderMaterial({
+                uniforms: THREE.UniformsUtils.clone(sandShader.uniforms),
+                vertexShader: sandShader.vertexShader,
+                fragmentShader: sandShader.fragmentShader,
+                lights: true
+            });
+            if (baseColor) material.uniforms.color.value.set(baseColor);
+            return material;
+        }
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0xfbb03b); // Sunset Orange
-            scene.fog = new THREE.Fog(0xfbb03b, 50, 200);
+            scene.background = new THREE.Color(0x87CEEB); 
+            scene.fog = new THREE.Fog(0x87CEEB, 80, 250);
 
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
             
@@ -165,11 +227,11 @@
             spawnEnemies();
             spawnCollectibles();
 
-            // Inputs (ARROWS + WASD Support)
             window.addEventListener('keydown', e => {
                 keys[e.code] = true;
                 if(e.code === 'KeyE' && gameActive) handleAction();
                 if(e.code === 'KeyQ' && currentCapture) releaseCapture();
+                if((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && gameActive) dash();
             });
             window.addEventListener('keyup', e => keys[e.code] = false);
             
@@ -196,57 +258,88 @@
         }
 
         function setupLights() {
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
             const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-            sun.position.set(100, 100, 50);
+            sun.position.set(50, 100, 50);
             sun.castShadow = true;
             sun.shadow.mapSize.set(2048, 2048);
-            sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
-            sun.shadow.camera.top = 150; sun.shadow.camera.bottom = -150;
+            sun.shadow.camera.left = -200; sun.shadow.camera.right = 200;
+            sun.shadow.camera.top = 200; sun.shadow.camera.bottom = -200;
             scene.add(sun);
         }
 
         function createEnvironment() {
-            // Textured Sand Ground
-            const ground = new THREE.Mesh(
-                new THREE.PlaneGeometry(800, 800),
-                new THREE.MeshPhongMaterial({ color: 0xedc9af })
-            );
+            // Ground with custom sand shader
+            const ground = new THREE.Mesh(new THREE.PlaneGeometry(1200, 1200), getSandMaterial());
             ground.rotation.x = -Math.PI / 2;
             ground.receiveShadow = true;
             scene.add(ground);
             platforms.push(ground);
 
-            // Detailed Ruins - More complexity
-            // Main Plaza
-            addStructure(40, 1, 40, 0, 0.5, -40, 0xd2b48c); 
-            
-            // Central Palace Structure
-            addStructure(20, 15, 20, 0, 7.5, -40, 0x8b7355); 
-            addStructure(15, 20, 15, 0, 10, -40, 0xa08260); 
-            addStructure(8, 30, 8, 0, 15, -40, 0xcdad00); // The spire
-            
-            // Floating ruins leading higher
-            addStructure(6, 1, 6, -20, 12, -40, 0x8b4513);
-            addStructure(6, 1, 6, -30, 18, -20, 0x8b4513);
-            addStructure(10, 1, 10, 0, 25, -10, 0x8b4513);
+            // TOWER COMPLEX
+            addStructure(60, 4, 60, 0, 1, -80, getSandMaterial(0xc2a48c));
+            addStructure(50, 4, 50, 0, 4, -80, getSandMaterial(0xd2b48c));
+            addStructure(40, 10, 40, 0, 10, -80, getSandMaterial(0x8b7355));
+            addStructure(25, 10, 25, 0, 20, -80, getSandMaterial(0x9b8365));
+            addStructure(10, 15, 10, 0, 32, -80, getSandMaterial(0xcdad00)); 
 
-            // Columns and Walls
-            for(let i=0; i<8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const r = 35;
-                addStructure(3, 12, 3, Math.cos(angle)*r, 6, Math.sin(angle)*r - 40, 0x8b7355);
+            // PATHS
+            addStructure(12, 1, 20, 0, 1, -40, getSandMaterial(0x8b7355));
+            addStructure(12, 1, 15, 0, 5, -55, getSandMaterial(0x8b7355));
+            
+            const steps = 8;
+            for(let i=0; i<steps; i++) {
+                const angle = (i / steps) * Math.PI * 1.5;
+                const radius = 18;
+                const x = Math.cos(angle) * radius;
+                const z = Math.sin(angle) * radius - 80;
+                addStructure(6, 1, 6, x, 15 + i*3, z, getSandMaterial(0x8b4513));
             }
 
-            // High Moon Platform
-            addStructure(5, 0.5, 5, 50, 15, -10, 0xcdad00);
+            // DECORATIONS
+            for(let i=0; i<30; i++) {
+                const x = Math.random() * 400 - 200;
+                const z = Math.random() * 400 - 200;
+                if (Math.abs(x) < 40 && z < -40) continue;
+                createCactus(x, 0, z);
+            }
+
+            for(let i=0; i<25; i++) {
+                const x = Math.random() * 300 - 150;
+                const z = Math.random() * 300 - 150;
+                if (Math.abs(x) < 30 && z < -30) continue;
+                const height = 2 + Math.random() * 12;
+                addStructure(3, height, 3, x, height/2, z, getSandMaterial(0x8b7355));
+                if(Math.random() > 0.5) addStructure(2, 1, 2, x + 3, 0.5, z + 1, getSandMaterial(0x8b7355));
+            }
+
+            addStructure(40, 1, 40, -100, 0.5, 50, getSandMaterial(0x40a040)); 
+            addStructure(15, 8, 15, -100, 4, 50, getSandMaterial(0x8b7355)); 
+            addStructure(12, 0.5, 12, 80, 22, 40, getSandMaterial(0xcdad00));
+            addStructure(4, 0.5, 30, 80, 22, 15, getSandMaterial(0x8b4513)); 
         }
 
-        function addStructure(w, h, d, x, y, z, col) {
-            const mesh = new THREE.Mesh(
-                new THREE.BoxGeometry(w, h, d),
-                new THREE.MeshPhongMaterial({ color: col })
+        function createCactus(x, y, z) {
+            const cactus = new THREE.Group();
+            const body = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.5, 0.5, 4, 8),
+                new THREE.MeshPhongMaterial({ color: 0x2d5a27 })
             );
+            body.position.y = 2;
+            cactus.add(body);
+            if(Math.random() > 0.3) {
+                const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 1.5, 8), new THREE.MeshPhongMaterial({ color: 0x2d5a27 }));
+                arm.position.set(0.6, 2.5, 0);
+                arm.rotation.z = Math.PI / 3;
+                cactus.add(arm);
+            }
+            cactus.position.set(x, y, z);
+            cactus.castShadow = true;
+            scene.add(cactus);
+        }
+
+        function addStructure(w, h, d, x, y, z, material) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
             mesh.position.set(x, y, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
@@ -259,12 +352,16 @@
             player = new THREE.Group();
             
             if(currentCapture === 'goomba') {
-                const gBody = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), new THREE.MeshPhongMaterial({color: 0x8b4513}));
-                gBody.position.y = 0.7;
-                player.add(gBody);
-                const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), new THREE.MeshPhongMaterial({color: 0xff0000}));
-                hat.position.y = 1.4;
-                player.add(hat);
+                for(let i=0; i < goombaStackCount; i++) {
+                    const gBody = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), new THREE.MeshPhongMaterial({color: 0x8b4513}));
+                    gBody.position.y = 0.7 + (i * 1.2);
+                    player.add(gBody);
+                    if(i === goombaStackCount - 1) {
+                        const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 12), new THREE.MeshPhongMaterial({color: 0xff0000}));
+                        hat.position.y = 1.4 + (i * 1.2);
+                        player.add(hat);
+                    }
+                }
             } else {
                 const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 12), new THREE.MeshPhongMaterial({color: 0xff0000}));
                 body.position.y = 0.8;
@@ -294,7 +391,7 @@
         }
 
         function spawnEnemies() {
-            const locations = [[15, 1, -15], [-15, 1, 20], [0, 11, -30], [20, 1, -60]];
+            const locations = [[20, 1, -20], [-50, 1, 40], [0, 11, -80], [100, 1, -100], [-100, 1, 80], [40, 1, 60], [-80, 1, -50]];
             locations.forEach(loc => {
                 const goomba = new THREE.Group();
                 const body = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 10), new THREE.MeshPhongMaterial({color: 0x8b4513}));
@@ -310,26 +407,27 @@
         function spawnCollectibles() {
             const moonGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.15, 16);
             const moonMat = new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0x666600 });
-            
-            [[0, 31, -40], [50, 16.5, -10], [-40, 1, 20]].forEach(p => {
+            [[0, 41.5, -80], [80, 23.5, 40], [-100, 9.5, 50], [150, 1, 150]].forEach(p => {
                 const m = new THREE.Mesh(moonGeo, moonMat);
                 m.position.set(...p);
                 m.rotation.z = Math.PI/2;
                 scene.add(m); moons.push(m);
             });
-
-            for(let i=0; i<40; i++) {
+            for(let i=0; i<80; i++) {
                 const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.05, 12), new THREE.MeshPhongMaterial({color: 0xffd700}));
-                coin.position.set(Math.random()*200-100, 0.5, Math.random()*200-100);
+                coin.position.set(Math.random()*400-200, 0.5, Math.random()*400-200);
                 coin.rotation.z = Math.PI/2;
                 scene.add(coin); coins.push(coin);
             }
         }
 
         function handleAction() {
-            if (!isCappyOut && !currentCapture) {
-                throwCappy();
-            }
+            if (!isCappyOut && !currentCapture) throwCappy();
+        }
+
+        function dash() {
+            const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+            dashVelocity.copy(forward).multiplyScalar(CONFIG.dashPower);
         }
 
         function throwCappy() {
@@ -337,21 +435,15 @@
             cappy.visible = true;
             capJumpAvailable = true;
             cappy.position.copy(player.position).add(new THREE.Vector3(0, 1.4, 0));
-            
             const forward = new THREE.Vector3(0,0,1).applyQuaternion(player.quaternion);
-            cappy.userData = { 
-                dir: forward, 
-                dist: 0, 
-                returning: false, 
-                stayTime: CONFIG.cappyStayDuration 
-            };
-            
+            cappy.userData = { dir: forward, dist: 0, returning: false, stayTime: CONFIG.cappyStayDuration };
             const mHat = player.getObjectByName("mario_hat");
             if(mHat) mHat.visible = false;
         }
 
         function captureEnemy(enemy) {
             currentCapture = enemy.userData.type;
+            goombaStackCount = 1;
             const pos = enemy.position.clone();
             scene.remove(enemy);
             enemies = enemies.filter(e => e !== enemy);
@@ -366,6 +458,7 @@
         function releaseCapture() {
             const pos = player.position.clone();
             currentCapture = null;
+            goombaStackCount = 1;
             createPlayer();
             player.position.copy(pos);
             player.position.y += 2;
@@ -378,16 +471,16 @@
 
             // Camera
             const camDir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-            const camTarget = player.position.clone().add(new THREE.Vector3(0, 1.5, 0));
-            camera.position.copy(camTarget).sub(camDir.clone().multiplyScalar(12));
+            const camTarget = player.position.clone().add(new THREE.Vector3(0, 1.5 + (goombaStackCount * 0.6), 0));
+            camera.position.copy(camTarget).sub(camDir.clone().multiplyScalar(15 + (goombaStackCount * 1.2)));
             camera.lookAt(camTarget);
 
-            // Movement (Arrows + WASD)
+            // Movement
             const moveDir = new THREE.Vector3();
-            if (keys['ArrowUp'] || keys['KeyW']) moveDir.z += 1;
-            if (keys['ArrowDown'] || keys['KeyS']) moveDir.z -= 1;
-            if (keys['ArrowLeft'] || keys['KeyA']) moveDir.x += 1;
-            if (keys['ArrowRight'] || keys['KeyD']) moveDir.x -= 1;
+            if (keys['ArrowUp']) moveDir.z += 1;
+            if (keys['ArrowDown']) moveDir.z -= 1;
+            if (keys['ArrowLeft']) moveDir.x += 1;
+            if (keys['ArrowRight']) moveDir.x -= 1;
 
             const speed = currentCapture === 'goomba' ? CONFIG.goombaSpeed : CONFIG.marioSpeed;
 
@@ -400,13 +493,16 @@
                 player.rotation.y = Math.atan2(finalDir.x, finalDir.z);
             }
 
+            player.position.add(dashVelocity);
+            dashVelocity.multiplyScalar(CONFIG.dashDecay);
+
             // Jump
             if (keys['Space'] && !isJumping) {
                 isJumping = true;
-                velocityY = currentCapture === 'goomba' ? CONFIG.goombaJump : CONFIG.marioJump;
+                velocityY = currentCapture === 'goomba' ? (CONFIG.goombaJump * (1 + (goombaStackCount * 0.15))) : CONFIG.marioJump;
             }
 
-            // Cappy Logic
+            // Cappy
             if (isCappyOut) {
                 cappy.rotation.y += 0.4;
                 if (!cappy.userData.returning) {
@@ -421,7 +517,6 @@
                 } else {
                     if (cappy.userData.stayTime > 0) {
                         cappy.userData.stayTime--;
-                        // Cap Jump
                         if (capJumpAvailable && player.position.distanceTo(cappy.position) < 2.0 && velocityY < 0.1) {
                             velocityY = CONFIG.capJumpBoost;
                             capJumpAvailable = false;
@@ -430,8 +525,7 @@
                     } else {
                         const toPlayer = player.position.clone().add(new THREE.Vector3(0, 1.4, 0)).sub(cappy.position);
                         if (toPlayer.length() < 1.2) { 
-                            isCappyOut = false; 
-                            cappy.visible = false; 
+                            isCappyOut = false; cappy.visible = false; 
                             const mHat = player.getObjectByName("mario_hat");
                             if(mHat) mHat.visible = true;
                         } else {
@@ -441,11 +535,25 @@
                 }
             }
 
+            // Goomba Stacking Detection
+            if (currentCapture === 'goomba') {
+                enemies.forEach(e => {
+                    if (player.position.distanceTo(e.position) < 1.8) {
+                        if (velocityY < 0 && player.position.y > e.position.y + 0.5) {
+                            goombaStackCount++;
+                            scene.remove(e);
+                            enemies = enemies.filter(item => item !== e);
+                            createPlayer();
+                            velocityY = 0.2; 
+                        }
+                    }
+                });
+            }
+
             // Gravity & Collision
             velocityY += CONFIG.gravity;
             player.position.y += velocityY;
 
-            let onGround = false;
             platforms.forEach(plat => {
                 const box = new THREE.Box3().setFromObject(plat);
                 const pBox = new THREE.Box3().setFromCenterAndSize(player.position.clone().add(new THREE.Vector3(0,0.8,0)), new THREE.Vector3(1.2,1.6,1.2));
@@ -454,21 +562,19 @@
                         player.position.y = box.max.y;
                         velocityY = 0;
                         isJumping = false;
-                        onGround = true;
                         capJumpAvailable = true;
                     }
                 }
             });
 
-            if (player.position.y < -20) { player.position.set(0, 5, 0); velocityY = 0; }
+            if (player.position.y < -30) { player.position.set(0, 5, 0); velocityY = 0; }
 
             // Collectibles
             moons.forEach(m => {
                 if (m.visible) {
                     m.rotation.y += 0.05;
-                    if (player.position.distanceTo(m.position) < 2.2) {
-                        m.visible = false;
-                        moonCollected++;
+                    if (player.position.distanceTo(m.position) < 2.2 + (goombaStackCount * 0.5)) {
+                        m.visible = false; moonCollected++;
                         document.getElementById('moon-count').innerText = moonCollected;
                     }
                 }
@@ -476,9 +582,8 @@
             coins.forEach(c => {
                 if (c.visible) {
                     c.rotation.y += 0.1;
-                    if (player.position.distanceTo(c.position) < 1.5) {
-                        c.visible = false;
-                        coinCollected++;
+                    if (player.position.distanceTo(c.position) < 1.5 + (goombaStackCount * 0.5)) {
+                        c.visible = false; coinCollected++;
                         document.getElementById('coin-count').innerText = coinCollected;
                     }
                 }
