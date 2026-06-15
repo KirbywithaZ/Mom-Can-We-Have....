@@ -1,0 +1,2218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <title>Re: Wild - Metroidvania</title>
+    <!-- Tailwind CSS for modern responsive UI layout -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Prevents default browser behaviors on mobile to optimize touching */
+        body {
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            background-color: #0d0e15;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            display: block;
+        }
+        /* Styling virtual controller overlay */
+        .no-select {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen text-slate-100 font-sans">
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="relative w-full max-w-4xl h-full aspect-video bg-[#12131c] md:rounded-2xl overflow-hidden shadow-2xl border border-slate-800 flex flex-col justify-between">
+        
+        <!-- Menu Overlay Screen -->
+        <div id="menu-screen" class="absolute inset-0 z-20 flex flex-col items-center justify-center bg-gradient-to-b from-[#12131c]/95 to-[#08090e]/98 p-6 text-center">
+            <div class="mb-2 text-emerald-400 font-bold tracking-widest text-sm uppercase">An Overgrown Robo-World</div>
+            <h1 class="text-4xl md:text-6xl font-extrabold text-white tracking-wider mb-2 drop-shadow-[0_4px_12px_rgba(52,211,153,0.3)]">
+                RE: <span class="text-emerald-400">WILD</span>
+            </h1>
+            <p class="max-w-md text-slate-400 text-xs md:text-sm mb-6 leading-relaxed">
+                Humanity is gone. Nature's survivors fight back against decaying robotic automated systems. Play as <span class="text-amber-300 font-semibold">Nano the Cat</span> to reclaim the overgrown ruins.
+            </p>
+
+            <div class="flex flex-wrap justify-center gap-3 mb-6 max-w-xl">
+                <span class="px-3 py-1 bg-slate-800/80 rounded-full text-xs text-slate-300 border border-slate-700">🐾 Run & Jump</span>
+                <span class="px-3 py-1 bg-slate-800/80 rounded-full text-xs text-slate-300 border border-slate-700">💥 Claw Slash</span>
+                <span class="px-3 py-1 bg-slate-800/80 rounded-full text-xs text-slate-300 border border-slate-700">🦴 Crouch & Sneak</span>
+                <span class="px-3 py-1 bg-emerald-950/80 rounded-full text-xs text-emerald-400 border border-emerald-800">✨ Dash Upgrade</span>
+                <span class="px-3 py-1 bg-emerald-950/80 rounded-full text-xs text-emerald-400 border border-emerald-800">🧗 Wall Climb Upgrade</span>
+                <span class="px-3 py-1 bg-emerald-950/80 rounded-full text-xs text-emerald-400 border border-emerald-800">👟 Double Jump Upgrade</span>
+            </div>
+
+            <button id="btn-start" class="px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-lg shadow-lg hover:shadow-emerald-500/20 active:scale-95 transition transform duration-150 text-lg">
+                RUN PROGRAM (START)
+            </button>
+
+            <!-- Controls Info Desk/Mob -->
+            <div class="mt-6 text-slate-500 text-[10px] md:text-xs">
+                <div class="hidden md:block">Desktop: <span class="text-slate-300">A/D</span> Move | <span class="text-slate-300">Space/W</span> Jump | <span class="text-slate-300">S/↓</span> Crouch | <span class="text-slate-300">J</span> Attack | <span class="text-slate-300">K</span> Dash | <span class="text-slate-300">M</span> Map | <span class="text-slate-300">F</span> Fullscreen</div>
+                <div class="md:hidden">Use Virtual D-Pad and On-Screen Buttons below!</div>
+            </div>
+        </div>
+
+        <!-- Game Over/Victory Screen -->
+        <div id="game-over-screen" class="absolute inset-0 z-20 hidden flex-col items-center justify-center bg-black/90 p-6 text-center">
+            <h2 id="end-title" class="text-3xl md:text-5xl font-extrabold text-red-500 mb-2">SYSTEM ERROR</h2>
+            <p id="end-desc" class="text-slate-400 text-sm md:text-base max-w-md mb-6">Nano has flatlined. The robot threat remains unchecked.</p>
+            <button id="btn-restart" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-md shadow transition duration-150">
+                REBOOT CORES (RETAIN UPGRADES)
+            </button>
+        </div>
+
+        <!-- TOP GAME BAR (HUD) -->
+        <div class="absolute top-0 inset-x-0 p-3 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10">
+            <!-- Health and Energy Bar -->
+            <div class="flex items-center space-x-3">
+                <div class="relative w-10 h-10 rounded-full bg-amber-500/10 border-2 border-amber-400 flex items-center justify-center shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                    <span class="text-xl">🐱</span>
+                </div>
+                <div>
+                    <!-- Health Bar -->
+                    <div class="flex items-center space-x-1 mb-1">
+                        <span class="text-[10px] text-red-400 font-mono font-bold w-4">HP</span>
+                        <div class="w-24 md:w-36 h-2.5 bg-slate-800 rounded-sm overflow-hidden border border-slate-700/50 flex">
+                            <div id="hp-bar" class="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all duration-150" style="width: 100%;"></div>
+                        </div>
+                        <span id="hp-text" class="text-[10px] font-mono text-slate-400 ml-1">3/3</span>
+                    </div>
+                    <!-- Upgrades Icons Active -->
+                    <div class="flex space-x-1 text-xs">
+                        <span id="icon-double-jump" class="opacity-20 filter grayscale" title="Double Jump Unlocked">👟</span>
+                        <span id="icon-dash" class="opacity-20 filter grayscale" title="Dash Unlocked">⚡</span>
+                        <span id="icon-wall-climb" class="opacity-20 filter grayscale" title="Wall Climb Unlocked">🧗</span>
+                        <span id="icon-boss-key" class="opacity-20 filter grayscale" title="Lab Core Key Card">🔑</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sector Name / Map / Status -->
+            <div class="flex flex-col items-end">
+                <div class="flex items-center space-x-2">
+                    <button id="btn-fullscreen" class="text-[9px] font-mono text-slate-400 bg-slate-900 hover:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 pointer-events-auto cursor-pointer" title="Toggle Fullscreen (F)">⛶ FS</button>
+                    <button id="btn-map-hud" class="text-[9px] font-mono text-emerald-400 bg-slate-900 hover:bg-slate-800 px-1.5 py-0.5 rounded border border-emerald-800 pointer-events-auto cursor-pointer" title="Toggle Map (M)">🗺 MAP</button>
+                </div>
+                <div id="sector-display" class="text-[11px] font-mono font-bold tracking-widest text-emerald-400 uppercase mt-1">Overgrown Outpost - Sector A-1</div>
+                <!-- Mini map toggle button / Preview -->
+                <div class="flex items-center space-x-2 mt-1">
+                    <span class="text-[9px] font-mono text-slate-400 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">MAP COMPLETED: <span id="map-percent">10%</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CANVAS GAME WORLD -->
+        <div class="relative flex-1 w-full bg-[#181923] flex items-center justify-center overflow-hidden">
+            <canvas id="gameCanvas" class="w-full h-full object-contain"></canvas>
+            
+            <!-- In-game minimap overlay (M key toggle) -->
+            <div id="hud-minimap" class="absolute bottom-3 right-3 z-10 pointer-events-none opacity-0 transition-opacity duration-200">
+                <div class="bg-black/80 border border-emerald-700 rounded p-1.5">
+                    <div class="text-[8px] font-mono text-emerald-400 mb-1 text-center tracking-widest">MAP</div>
+                    <canvas id="hudMapCanvas" width="160" height="100"></canvas>
+                </div>
+            </div>
+            <div id="screen-alert" class="absolute top-1/4 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-slate-950/90 border border-emerald-400 px-4 py-2.5 rounded-lg shadow-xl text-center pointer-events-none opacity-0 transition-opacity duration-300 z-10 max-w-xs md:max-w-md">
+                <p id="alert-title" class="text-xs font-bold text-emerald-400 uppercase tracking-widest mb-0.5"></p>
+                <p id="alert-body" class="text-xs text-slate-200"></p>
+            </div>
+        </div>
+
+        <!-- MOBILE CONTROLLER INTERFACE -->
+        <div id="mobile-controls" class="no-select w-full bg-[#0d0e15] border-t border-slate-800 p-3 flex justify-between items-center touch-none select-none z-10 md:hidden">
+            <!-- Left D-Pad Controls -->
+            <div class="flex space-x-2">
+                <button id="btn-left" class="w-14 h-14 bg-slate-800 active:bg-slate-700 rounded-xl flex items-center justify-center text-2xl font-bold text-slate-300 border border-slate-700 shadow-md transform active:scale-90 transition-transform">
+                    ◀
+                </button>
+                <button id="btn-down" class="w-14 h-14 bg-slate-800 active:bg-slate-700 rounded-xl flex items-center justify-center text-2xl font-bold text-slate-300 border border-slate-700 shadow-md transform active:scale-90 transition-transform">
+                    ▼
+                </button>
+                <button id="btn-right" class="w-14 h-14 bg-slate-800 active:bg-slate-700 rounded-xl flex items-center justify-center text-2xl font-bold text-slate-300 border border-slate-700 shadow-md transform active:scale-90 transition-transform">
+                    ▶
+                </button>
+            </div>
+
+            <!-- Mini Map Overview Modal Button (Trigger/Hint) -->
+            <div class="flex flex-col items-center">
+                <button id="btn-map-toggle" class="px-2.5 py-1.5 bg-slate-900 active:bg-slate-800 border border-slate-700 rounded text-[10px] text-emerald-400 font-mono tracking-wider">
+                    📜 MAP VIEW
+                </button>
+            </div>
+
+            <!-- Right Action Buttons -->
+            <div class="flex space-x-2">
+                <!-- Slash/Attack -->
+                <button id="btn-attack" class="w-14 h-14 bg-rose-950/80 active:bg-rose-900 text-rose-400 rounded-full flex items-center justify-center text-lg font-bold border border-rose-800 shadow-lg transform active:scale-90 transition-transform">
+                    ⚔️
+                </button>
+                <!-- Dash -->
+                <button id="btn-dash" class="w-12 h-12 bg-amber-950/80 active:bg-amber-900 text-amber-400 rounded-full flex items-center justify-center text-xs font-bold border border-amber-800 shadow-lg transform active:scale-90 transition-transform opacity-40">
+                    ⚡
+                </button>
+                <!-- Jump -->
+                <button id="btn-jump" class="w-14 h-14 bg-sky-950/80 active:bg-sky-900 text-sky-400 rounded-full flex items-center justify-center text-lg font-bold border border-sky-800 shadow-lg transform active:scale-90 transition-transform">
+                    ▲
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Modal -->
+    <div id="map-modal" class="fixed inset-0 bg-black/85 z-50 hidden flex-col items-center justify-center p-4">
+        <div class="bg-[#12131c] border-2 border-emerald-500 rounded-xl w-full max-w-2xl p-4 flex flex-col h-[80vh] shadow-2xl">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-emerald-400 font-mono font-bold text-sm tracking-wider">🗺️ WORLD LABYRINTH MAP</h3>
+                <button id="btn-close-map" class="text-slate-400 hover:text-white font-bold text-xl px-2">×</button>
+            </div>
+            <!-- Map Legend -->
+            <div class="grid grid-cols-5 gap-2 text-[10px] text-slate-400 font-mono bg-slate-950/50 p-2 rounded mb-3 border border-slate-800">
+                <div class="flex items-center"><span class="w-3 h-3 bg-slate-700 mr-1.5 rounded-sm"></span> Explored</div>
+                <div class="flex items-center"><span class="w-3 h-3 bg-emerald-500 mr-1.5 rounded-sm"></span> You Here</div>
+                <div class="flex items-center"><span class="w-3 h-3 bg-purple-500 mr-1.5 rounded-sm"></span> Core Lock</div>
+                <div class="flex items-center"><span class="w-3 h-3 bg-amber-500 mr-1.5 rounded-sm"></span> Upgrades</div>
+                <div class="flex items-center"><span class="w-3 h-3 bg-red-600 mr-1.5 rounded-sm"></span> Boss Arena</div>
+            </div>
+            <!-- Map Grid Wrapper -->
+            <div class="flex-1 bg-[#08090e] rounded border border-slate-800 p-2 flex items-center justify-center overflow-auto relative">
+                <canvas id="miniMapCanvas" class="max-w-full max-h-full"></canvas>
+            </div>
+            <!-- Progression Guide footer -->
+            <div class="mt-3 text-center text-xs text-slate-400 font-mono flex flex-wrap justify-center gap-x-4 gap-y-1">
+                <span>⚔️ Defeat Cyber-Keeper in Room [4, 1] to reclaim the world!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script>
+        // Metroidvania Game State, World Configuration, and Engine Settings.
+        
+        // --- GAME ASSET COLORS & STYLES ---
+        const COLORS = {
+            bg: "#0f1017",
+            bgDark: "#08090c",
+            gridLine: "#1c1e2d",
+            wall: "#334155",
+            wallDark: "#1e293b",
+            ledge: "#475569",
+            flora: "#10b981", // glowing green overgrown plants
+            floraLight: "#34d399",
+            player: "#fcd34d", // ginger cyber-cat
+            playerCore: "#f59e0b",
+            enemyScrap: "#ef4444",
+            projectile: "#38bdf8",
+            dashGlow: "#60a5fa",
+            hazard: "#dc2626"
+        };
+
+        // --- MAP AND SCREEN WORLD CONFIG ---
+        // An interconnected Grid of Rooms. Map size: 5 columns x 3 rows
+        // Each Room is sized internally by pixels (e.g., 800 width x 450 height)
+        const ROOM_WIDTH = 800;
+        const ROOM_HEIGHT = 450;
+        const MAP_COLS = 5;
+        const MAP_ROWS = 3;
+
+        // Initialize empty room matrix.
+        const worldMap = [];
+        for (let r = 0; r < MAP_ROWS; r++) {
+            worldMap[r] = [];
+            for (let c = 0; c < MAP_COLS; c++) {
+                worldMap[r][c] = {
+                    exists: false,
+                    explored: false,
+                    hasUpgrade: null, // "double-jump", "dash", "wall-climb", "boss-key"
+                    hasHazards: false,
+                    isBossRoom: false,
+                    isSpawn: false,
+                    title: `Overgrown Outpost - Sector ${String.fromCharCode(65 + r)}-${c + 1}`,
+                    platforms: [],
+                    doors: { top: false, bottom: false, left: false, right: false },
+                    enemies: [],
+                    hazardLasers: []
+                };
+            }
+        }
+
+        // --- ROOM GENERATOR ---
+        // Building a real Metroidvania layout - ALL set in the Overgrown Outpost
+        // Room Layout coordinates [row][col]
+        // [0,0] Spawn Room (Left Wall Blocked) -> Connection right
+        // [0,1] Double Jump Upgrade Room (leads up/right/down)
+        // [1,1] Hazard Pit & Climb Upgrade Path
+        // [1,2] Key Card Core Security
+        // [2,2] Lab Corridor Dash Upgrade
+        // [1,0] Secret Health Core (needs Double Jump or Dash)
+        // [0,2] Boss Gate Barrier (requires Key Card)
+        // [0,3] Sector Transition Tunnel
+        // [0,4] Grand Core Central: The Ancient Defense Robot (BOSS)
+
+        // Setup Existances using Object.assign to preserve inner template properties (like doors structure)
+        Object.assign(worldMap[0][0], { exists: true, isSpawn: true, title: "Overgrown Outpost (Sector A-1)" });
+        Object.assign(worldMap[0][1], { exists: true, hasUpgrade: "double-jump", title: "Overgrown Outpost - Gravity Vault (Sector A-2)" });
+        Object.assign(worldMap[1][1], { exists: true, hasHazards: true, title: "Overgrown Outpost - Automated Waste Facility" });
+        Object.assign(worldMap[1][2], { exists: true, hasUpgrade: "boss-key", title: "Overgrown Outpost - Security Core Archive" });
+        Object.assign(worldMap[2][2], { exists: true, hasUpgrade: "dash", title: "Overgrown Outpost - Auxiliary Thrust Chamber" });
+        Object.assign(worldMap[1][0], { exists: true, hasUpgrade: "health-core", title: "Overgrown Outpost - Hidden Emergency Stash" });
+        Object.assign(worldMap[0][2], { exists: true, title: "Overgrown Outpost - Lab Security Vestibule" });
+        Object.assign(worldMap[0][3], { exists: true, title: "Overgrown Outpost - Cybernetic Access Tunnel" });
+        Object.assign(worldMap[0][4], { exists: true, isBossRoom: true, title: "Overgrown Outpost - Sector Omega: Defense Core" });
+
+        // Mark explorability
+        worldMap[0][0].explored = true;
+
+        // Configure interconnected doors
+        function connectRooms(r1, c1, r2, c2) {
+            if (r1 === r2) {
+                // Horizontal
+                const minCol = Math.min(c1, c2);
+                worldMap[r1][minCol].doors.right = true;
+                worldMap[r1][minCol + 1].doors.left = true;
+            } else if (c1 === c2) {
+                // Vertical
+                const minRow = Math.min(r1, r2);
+                worldMap[minRow][c1].doors.bottom = true;
+                worldMap[minRow + 1][c1].doors.top = true;
+            }
+        }
+
+        // Establish connections
+        connectRooms(0,0, 0,1); // Spawn <-> Gravity Vault
+        connectRooms(0,1, 1,1); // Vault <-> Waste Facility
+        connectRooms(1,1, 1,2); // Waste <-> Security Core
+        connectRooms(1,2, 2,2); // Security <-> Thrust Chamber
+        connectRooms(1,0, 1,1); // Hidden <-> Waste Facility
+        connectRooms(0,1, 0,2); // Vault <-> Security Vestibule
+        connectRooms(0,2, 0,3); // Vestibule <-> Tunnel
+        connectRooms(0,3, 0,4); // Tunnel <-> Boss
+
+        // --- BUILDING DETAILED SCENERY PER ROOM ---
+        function populatePlatforms() {
+            // Room [0,0] - Spawn Room
+            const r00 = worldMap[0][0];
+            r00.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 35, w: ROOM_WIDTH, h: 40, type: "ground" }, // floor
+                { x: 0, y: 0, w: 30, h: ROOM_HEIGHT, type: "wall" }, // left wall border (closed)
+                { x: 180, y: 310, w: 120, h: 16, type: "ledge" },
+                { x: 380, y: 240, w: 140, h: 16, type: "ledge" },
+                { x: 580, y: 310, w: 120, h: 16, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+
+            // Room [0,1] - Double Jump Vault
+            const r01 = worldMap[0][1];
+            r01.platforms = [
+                // Split floor to allow dropping down to Room [1,1] in the middle (x: 300 to 500)
+                { x: 0, y: ROOM_HEIGHT - 35, w: 300, h: 40, type: "ground" },
+                { x: 500, y: ROOM_HEIGHT - 35, w: 300, h: 40, type: "ground" },
+                { x: 120, y: 320, w: 100, h: 16, type: "ledge" },
+                { x: 300, y: 230, w: 200, h: 20, type: "ledge" }, // Platform holding upgrade
+                { x: 580, y: 320, w: 100, h: 16, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+
+            // Room [1,1] - Waste Facility (Spikes & Vertical Pit)
+            const r11 = worldMap[1][1];
+            r11.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 20, w: 220, h: 20, type: "ground" }, // Left safety block
+                { x: ROOM_WIDTH - 220, y: ROOM_HEIGHT - 20, w: 220, h: 20, type: "ground" }, // Right safety block
+                { x: 220, y: ROOM_HEIGHT - 10, w: 360, h: 15, type: "hazard" }, // Spikes pit in middle
+                { x: 150, y: 290, w: 100, h: 16, type: "ledge" },
+                { x: 350, y: 210, w: 100, h: 16, type: "ledge" },
+                { x: 550, y: 290, w: 100, h: 16, type: "ledge" },
+                // Sliced open doorways at the base of the walls (y: ROOM_HEIGHT - 120 to ROOM_HEIGHT)
+                { x: 0, y: 0, w: 30, h: ROOM_HEIGHT - 120, type: "wall" }, 
+                { x: ROOM_WIDTH - 30, y: 0, w: 30, h: ROOM_HEIGHT - 120, type: "wall" },
+                // Split ceiling to allow jumping back up to [0,1]
+                { x: 0, y: 0, w: 300, h: 25, type: "ceiling" },
+                { x: 500, y: 0, w: 300, h: 25, type: "ceiling" }
+            ];
+
+            // Room [1,0] - Secret Health Core
+            const r10 = worldMap[1][0];
+            r10.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 35, w: ROOM_WIDTH, h: 40, type: "ground" },
+                { x: 0, y: 0, w: 30, h: ROOM_HEIGHT, type: "wall" }, // left border limit (closed)
+                { x: ROOM_WIDTH - 30, y: 0, w: 30, h: ROOM_HEIGHT - 120, type: "wall" }, // open right doorway
+                { x: 250, y: 150, w: 300, h: 300, type: "solid-block" }, // Giant central blockade obstacle
+                { x: 100, y: 280, w: 80, h: 16, type: "ledge" },
+                { x: 620, y: 280, w: 80, h: 16, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+
+            // Room [1,2] - Security Core Archive
+            const r12 = worldMap[1][2];
+            r12.platforms = [
+                // Split floor to allow dropping down to [2,2]
+                { x: 0, y: ROOM_HEIGHT - 35, w: 300, h: 40, type: "ground" },
+                { x: 500, y: ROOM_HEIGHT - 35, w: 300, h: 40, type: "ground" },
+                { x: 0, y: 0, w: 30, h: ROOM_HEIGHT - 120, type: "wall" }, // open left doorway
+                { x: ROOM_WIDTH - 30, y: 0, w: 30, h: ROOM_HEIGHT, type: "wall" }, // closed right border
+                { x: 150, y: 310, w: 120, h: 16, type: "ledge" },
+                { x: 340, y: 230, w: 120, h: 16, type: "ledge" }, // platform for Core key
+                { x: 530, y: 310, w: 120, h: 16, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+
+            // Room [2,2] - Thrust Chamber (Dash Upgrade)
+            const r22 = worldMap[2][2];
+            r22.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 35, w: ROOM_WIDTH, h: 40, type: "ground" },
+                { x: 0, y: 0, w: 30, h: ROOM_HEIGHT, type: "wall" }, // closed left border
+                { x: ROOM_WIDTH - 30, y: 0, w: 30, h: ROOM_HEIGHT, type: "wall" }, // closed right border
+                { x: 150, y: 290, w: 500, h: 25, type: "solid-block" }, // Large divider block requiring wall sliding/jumping
+                { x: 380, y: 160, w: 140, h: 16, type: "ledge" },
+                // Split ceiling to allow jumping back up to [1,2]
+                { x: 0, y: 0, w: 300, h: 25, type: "ceiling" },
+                { x: 500, y: 0, w: 300, h: 25, type: "ceiling" }
+            ];
+
+            // Room [0,2] - Lab Security (Barrier Room)
+            const r02 = worldMap[0][2];
+            r02.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 35, w: ROOM_WIDTH, h: 40, type: "ground" },
+                { x: 350, y: 0, w: 80, h: ROOM_HEIGHT - 100, type: "solid-block" }, // Massive blocking pillar from ceiling
+                { x: 150, y: 300, w: 120, h: 16, type: "ledge" },
+                { x: 530, y: 300, w: 120, h: 16, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+            // Security Door block
+            r02.barrierLaser = { x: 375, y: ROOM_HEIGHT - 100, w: 30, h: 65, active: true };
+
+            // Room [0,3] - Cybernetic Access Tunnel
+            const r03 = worldMap[0][3];
+            r03.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 35, w: ROOM_WIDTH, h: 40, type: "ground" },
+                { x: 100, y: 310, w: 140, h: 16, type: "ledge" },
+                { x: 330, y: 240, w: 140, h: 16, type: "ledge" },
+                { x: 560, y: 170, w: 140, h: 16, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+            // The Gardener's Gate — overgrown iron gate blocks right exit, removed when Gardener is defeated
+            r03.gardenerGate = { x: ROOM_WIDTH - 55, y: 80, w: 25, h: ROOM_HEIGHT - 115, active: true };
+
+            // Room [0,4] - Boss Arena
+            const r04 = worldMap[0][4];
+            r04.platforms = [
+                { x: 0, y: ROOM_HEIGHT - 35, w: ROOM_WIDTH, h: 40, type: "ground" },
+                { x: ROOM_WIDTH - 30, y: 0, w: 30, h: ROOM_HEIGHT, type: "wall" }, // Absolute end
+                { x: 100, y: 300, w: 120, h: 16, type: "ledge" },
+                { x: 580, y: 300, w: 120, h: 16, type: "ledge" },
+                { x: 250, y: 200, w: 300, h: 20, type: "ledge" },
+                { x: 0, y: 0, w: ROOM_WIDTH, h: 25, type: "ceiling" }
+            ];
+        }
+
+        populatePlatforms();
+
+        // --- ENEMY RE-SPAWNING / POPULATION MATRIX ---
+        function populateEnemies() {
+            // Clear prior enemies
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    if (worldMap[r][c].exists) {
+                        worldMap[r][c].enemies = [];
+                    }
+                }
+            }
+
+            // Spawn Scrap Drones & Walkers in room contexts
+            // Sector A-2: Patrol drone with strict timed shootTimer
+            worldMap[0][1].enemies.push({
+                x: 150, y: 250, w: 24, h: 24, 
+                type: "patrol", 
+                hp: 2, maxHp: 2, 
+                vx: 1.5, dir: 1, 
+                startX: 120, endX: 250, 
+                damageFlash: 0,
+                shootTimer: 0 // Initialized timer pattern
+            });
+
+            // Sector Waste: Patrol drone + Shooting Core
+            worldMap[1][1].enemies.push(
+                { x: 180, y: 240, w: 24, h: 24, type: "patrol", hp: 2, maxHp: 2, vx: 1.2, dir: 1, startX: 150, endX: 250, damageFlash: 0, shootTimer: 20 },
+                { x: 580, y: 240, w: 24, h: 24, type: "patrol", hp: 2, maxHp: 2, vx: -1.2, dir: -1, startX: 520, endX: 650, damageFlash: 0, shootTimer: 80 }
+            );
+
+            // Secret Health Core Room: Strong automated Guardian bot
+            worldMap[1][0].enemies.push({
+                x: 120, y: ROOM_HEIGHT - 70, w: 32, h: 32,
+                type: "charger",
+                hp: 4, maxHp: 4,
+                vx: 0, dir: 1,
+                state: "idle", // idle, charge
+                timer: 0,
+                damageFlash: 0
+            });
+
+            // Thrust Chamber: Jumper Cyber-frog
+            worldMap[2][2].enemies.push({
+                x: 420, y: 120, w: 24, h: 24,
+                type: "jumper",
+                hp: 3, maxHp: 3,
+                vx: 0, vy: 0,
+                timer: 0,
+                damageFlash: 0
+            });
+
+            // Lab Access Tunnel: The Gardener mini-boss + turret drone
+            worldMap[0][3].enemies.push({
+                x: 350, y: 180, w: 24, h: 24,
+                type: "patrol",
+                hp: 2, maxHp: 2,
+                vx: 2.2, dir: 1,
+                startX: 330, endX: 470,
+                damageFlash: 0,
+                shootTimer: 0
+            });
+            // THE GARDENER - vine-controlling plant robot boss in the tunnel
+            worldMap[0][3].enemies.push({
+                x: 620, y: ROOM_HEIGHT - 115, w: 60, h: 80,
+                type: "gardener",
+                hp: 10, maxHp: 10,
+                timer: 0,
+                attackState: "sleep", // sleep, active, vines, spores, rage
+                vx: 0.8, dir: -1,
+                damageFlash: 0,
+                rageMode: false,
+                vineShotTimer: 0
+            });
+
+            // Boss Core Central: Ancient Titan Boss Robot
+            worldMap[0][4].enemies.push({
+                x: 400, y: ROOM_HEIGHT - 135, w: 80, h: 100,
+                type: "boss",
+                hp: 15, maxHp: 15,
+                timer: 0,
+                attackState: "sleep", // sleep, active, lasers, smash, shield
+                vx: 0.5, dir: -1,
+                damageFlash: 0
+            });
+        }
+
+        populateEnemies();
+
+        // --- GAME SYSTEM STATE VARIABLES ---
+        const game = {
+            running: false,
+            over: false,
+            victory: false,
+            // Track player upgrades unlocked (the Metroidvania elements)
+            upgrades: {
+                doubleJump: false,
+                dash: false,
+                wallClimb: false,
+                bossKey: false,
+                hpMax: 3
+            },
+            discoveredSectors: 1,
+            totalPossibleSectors: 9,
+            // Active Sector indexes
+            currentRoomRow: 0,
+            currentRoomCol: 0,
+            // Screen shake FX values
+            screenShake: 0,
+            cameraX: 0,
+            cameraY: 0
+        };
+
+        // --- PLAYER PHYSICS & COMBAT SPECIFICATIONS ---
+        // FINE-TUNED PHYSICS VALUES: Faster running, higher base jumps, and snappier airborne movement!
+        const player = {
+            x: 100,
+            y: ROOM_HEIGHT - 100,
+            w: 28,
+            h: 22, // Cats are horizontal low-profile climbers
+            vx: 0,
+            vy: 0,
+            speed: 5.2,          // Upgraded from 4.2 for faster agile running
+            jumpForce: -9.8,      // Upgraded from -8.5 to easily clear all high platforms
+            doubleJumpForce: -8.5, // Upgraded from -7.5 for satisfying double jump altitude
+            dashSpeed: 15,        // Snappier dash execution
+            gravity: 0.40,        // Scaled slightly up with jump force to prevent feeling "floaty"
+            friction: 0.84,       // High floor traction for instant stops
+            
+            // State tracking
+            grounded: false,
+            jumpCooldown: 0,
+            doubleJumpAvailable: false,
+            dashAvailable: false,
+            isDashing: false,
+            dashTimer: 0,
+            dashCooldown: 0,
+            dashDir: 1,
+            climbingWall: null, // "left" or "right" or null
+            facingDir: 1, // -1 or 1
+
+            // Health & Invulnerability status
+            hp: 3,
+            maxHp: 3,
+            invulnTimer: 0,
+            knockbackTimer: 0,
+            
+            // Attack animation tracking
+            attackTimer: 0,
+            attackRange: 42,
+            isAttacking: false,
+            
+            // Crouch state
+            isCrouching: false,
+            normalH: 22,
+            crouchH: 12,
+            
+            // Visual Animation helper state
+            walkCycle: 0,
+            isAirborne: false
+        };
+
+        // List collections
+        let particles = [];
+        let enemyProjectiles = [];
+        let alertTimeout = null;
+
+        // --- INITIALIZE AUDIO / SOUND EFFECTS (Procedural Web Audio) ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSynthSound(freq, type, duration, slideTo = 0) {
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                if (slideTo > 0) {
+                    osc.frequency.exponentialRampToValueAtTime(slideTo, audioCtx.currentTime + duration);
+                }
+                
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (err) {
+                // Audio Context safe fallback
+            }
+        }
+
+        function playSound(name) {
+            if (name === "jump") {
+                playSynthSound(160, "sine", 0.15, 480);
+            } else if (name === "double-jump") {
+                playSynthSound(220, "triangle", 0.2, 580);
+            } else if (name === "slash") {
+                playSynthSound(320, "sawtooth", 0.12, 100);
+            } else if (name === "hit") {
+                playSynthSound(150, "sawtooth", 0.25, 40);
+            } else if (name === "dash") {
+                playSynthSound(400, "triangle", 0.15, 800);
+            } else if (name === "powerup") {
+                playSynthSound(300, "sine", 0.4, 1200);
+            } else if (name === "laser") {
+                playSynthSound(600, "sawtooth", 0.3, 100);
+            } else if (name === "explosion") {
+                playSynthSound(100, "triangle", 0.45, 10);
+            }
+        }
+
+        // --- USER INTERFACE AND KEY INPUTS ---
+        const keys = {};
+        window.addEventListener("keydown", (e) => {
+            const key = e.key.toLowerCase();
+            keys[key] = true;
+            
+            // Check manual quick keys for desktop ease
+            if (key === "j" || key === "z") triggerAttack();
+            if (key === "k" || key === "x") triggerDash();
+            if (key === " " || key === "w") triggerJump();
+            if (key === "m") toggleHudMap();
+            if (key === "f") toggleFullscreen();
+        });
+        window.addEventListener("keyup", (e) => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Prevent space bar scrolling standard web viewport
+        window.addEventListener("keydown", (e) => {
+            if (e.key === " " && e.target === document.body) {
+                e.preventDefault();
+            }
+        });
+
+        // --- FULLSCREEN TOGGLE ---
+        let hudMapVisible = false;
+        function toggleFullscreen() {
+            const container = document.getElementById("game-container");
+            if (!document.fullscreenElement) {
+                (container.requestFullscreen || container.webkitRequestFullscreen || container.mozRequestFullScreen).call(container);
+            } else {
+                (document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen).call(document);
+            }
+        }
+
+        function toggleHudMap() {
+            hudMapVisible = !hudMapVisible;
+            const el = document.getElementById("hud-minimap");
+            if (hudMapVisible) {
+                el.style.opacity = "1";
+                renderHudMap();
+            } else {
+                el.style.opacity = "0";
+            }
+        }
+
+        function renderHudMap() {
+            const hCanvas = document.getElementById("hudMapCanvas");
+            if (!hCanvas) return;
+            const hCtx = hCanvas.getContext("2d");
+            hCanvas.width = 160;
+            hCanvas.height = 100;
+            const cellW = 26;
+            const cellH = 18;
+            const gap = 4;
+            const offsetX = (hCanvas.width - (MAP_COLS * (cellW + gap))) / 2;
+            const offsetY = (hCanvas.height - (MAP_ROWS * (cellH + gap))) / 2;
+            hCtx.fillStyle = "#08090e";
+            hCtx.fillRect(0, 0, hCanvas.width, hCanvas.height);
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    const room = worldMap[r][c];
+                    if (!room.exists) continue;
+                    const x = offsetX + c * (cellW + gap);
+                    const y = offsetY + r * (cellH + gap);
+                    if (room.explored) {
+                        const isCurrent = (r === game.currentRoomRow && c === game.currentRoomCol);
+                        hCtx.fillStyle = isCurrent ? "#10b981" : (room.isBossRoom ? "#7f1d1d" : "#1e293b");
+                        hCtx.fillRect(x, y, cellW, cellH);
+                        hCtx.strokeStyle = isCurrent ? "#34d399" : "#475569";
+                        hCtx.lineWidth = 1;
+                        hCtx.strokeRect(x, y, cellW, cellH);
+                        if (isCurrent) {
+                            hCtx.fillStyle = "#fff";
+                            hCtx.font = "bold 7px monospace";
+                            hCtx.textAlign = "center";
+                            hCtx.fillText("●", x + cellW/2, y + cellH/2 + 2.5);
+                        } else if (room.isBossRoom) {
+                            hCtx.fillStyle = "#ef4444";
+                            hCtx.font = "6px monospace";
+                            hCtx.textAlign = "center";
+                            hCtx.fillText("☠", x + cellW/2, y + cellH/2 + 2.5);
+                        } else if (room.hasUpgrade) {
+                            hCtx.fillStyle = "#f59e0b";
+                            hCtx.font = "6px monospace";
+                            hCtx.textAlign = "center";
+                            hCtx.fillText("★", x + cellW/2, y + cellH/2 + 2.5);
+                        }
+                        // Door connectors
+                        hCtx.fillStyle = "#64748b";
+                        if (room.doors.right) hCtx.fillRect(x + cellW, y + cellH/2 - 2, gap, 4);
+                        if (room.doors.bottom) hCtx.fillRect(x + cellW/2 - 2, y + cellH, 4, gap);
+                    } else {
+                        hCtx.fillStyle = "#0c0d12";
+                        hCtx.fillRect(x, y, cellW, cellH);
+                        hCtx.strokeStyle = "#1a1b24";
+                        hCtx.lineWidth = 1;
+                        hCtx.strokeRect(x, y, cellW, cellH);
+                    }
+                }
+            }
+        }
+
+        // --- SCREEN ALERT SYSTEM ---
+        function showAlert(title, text) {
+            const el = document.getElementById("screen-alert");
+            const titleEl = document.getElementById("alert-title");
+            const bodyEl = document.getElementById("alert-body");
+            
+            titleEl.textContent = title;
+            bodyEl.textContent = text;
+            el.style.opacity = "1";
+            
+            if (alertTimeout) clearTimeout(alertTimeout);
+            alertTimeout = setTimeout(() => {
+                el.style.opacity = "0";
+            }, 4500);
+        }
+
+        // --- PARTICLES ENGINE ---
+        function createExplosion(x, y, color, count = 12) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 1;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1.0,
+                    decay: Math.random() * 0.05 + 0.03,
+                    color: color,
+                    size: Math.random() * 4 + 1.5
+                });
+            }
+        }
+
+        // --- DYNAMIC TRAILS ---
+        function createTraceParticles(x, y, color) {
+            particles.push({
+                x, y,
+                vx: (Math.random() - 0.5) * 1,
+                vy: (Math.random() - 0.5) * 1,
+                life: 0.6,
+                decay: 0.04,
+                color: color,
+                size: Math.random() * 3 + 1
+            });
+        }
+
+        // --- CONTROLLER BUTTON LISTENERS ---
+        const startBtn = document.getElementById("btn-start");
+        const restartBtn = document.getElementById("btn-restart");
+        const menuScreen = document.getElementById("menu-screen");
+        const gameOverScreen = document.getElementById("game-over-screen");
+
+        startBtn.addEventListener("click", () => {
+            menuScreen.classList.add("hidden");
+            startGame();
+        });
+
+        restartBtn.addEventListener("click", () => {
+            gameOverScreen.classList.add("hidden");
+            resetGameSession();
+            startGame();
+        });
+
+        document.getElementById("btn-fullscreen")?.addEventListener("click", toggleFullscreen);
+        document.getElementById("btn-map-hud")?.addEventListener("click", () => {
+            toggleHudMap();
+            if (hudMapVisible) renderHudMap();
+        });
+
+        function startGame() {
+            game.running = true;
+            game.over = false;
+            // Initiate WebAudio on user interaction context
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            showAlert("PROGRAM STARTED", "Welcome to Re: Wild. Explore and locate hardware upgrades.");
+        }
+
+        function resetGameSession() {
+            // Reset player state but RETAIN permanent upgrades!
+            player.x = 100;
+            player.y = ROOM_HEIGHT - 100;
+            player.vx = 0;
+            player.vy = 0;
+            player.hp = player.maxHp; // Refills back to current maximum limit
+            game.currentRoomRow = 0;
+            game.currentRoomCol = 0;
+            
+            // Clean dynamic structures
+            particles = [];
+            enemyProjectiles = [];
+            
+            // Re-populate maps (re-spawn enemies but do not overwrite permanent upgrades collected)
+            populatePlatforms();
+            populateEnemies();
+            updateHUD();
+        }
+
+        // --- ACTION HANDLERS (Shared for Keyboard and Touch) ---
+        function triggerJump() {
+            if (!game.running || game.over) return;
+            
+            // Wall jump handling
+            if (player.climbingWall && game.upgrades.wallClimb) {
+                playSound("jump");
+                player.vy = player.jumpForce * 0.95;
+                player.vx = (player.climbingWall === "left" ? 1 : -1) * player.speed * 1.5;
+                player.climbingWall = null;
+                createExplosion(player.x + 14, player.y + 11, COLORS.flora, 5);
+                return;
+            }
+
+            if (player.grounded) {
+                playSound("jump");
+                player.vy = player.jumpForce;
+                player.grounded = false;
+                createExplosion(player.x + 14, player.y + 22, COLORS.ledge, 4);
+            } else if (player.doubleJumpAvailable && game.upgrades.doubleJump) {
+                playSound("double-jump");
+                player.vy = player.doubleJumpForce;
+                player.doubleJumpAvailable = false;
+                createExplosion(player.x + 14, player.y + 22, COLORS.projectile, 8);
+            }
+        }
+
+        // Enable wall climb upgrade by default to make map progression smoother
+        game.upgrades.wallClimb = true;
+
+        function triggerDash() {
+            if (!game.running || game.over || !game.upgrades.dash) return;
+            if (!player.dashAvailable || player.isDashing) return;
+
+            playSound("dash");
+            player.isDashing = true;
+            player.dashTimer = 12; // Frames of dashboard speed
+            player.dashCooldown = 35;
+            player.dashAvailable = false;
+            // Zero out current vertical fall velocity to make horizontal mid-air adjustments nice & sharp
+            player.vy = 0; 
+            createExplosion(player.x + 14, player.y + 11, COLORS.dashGlow, 10);
+        }
+
+        function triggerAttack() {
+            if (!game.running || game.over || player.isAttacking) return;
+
+            playSound("slash");
+            player.isAttacking = true;
+            player.attackTimer = 12; // Swing duration animation frames
+
+            // Attack Collision detection
+            const currentRoom = worldMap[game.currentRoomRow][game.currentRoomCol];
+            const slashX = player.facingDir === 1 ? player.x + player.w : player.x - player.attackRange;
+            const slashY = player.y - 10;
+            const slashW = player.attackRange;
+            const slashH = player.h + 20;
+
+            // Check enemies hit
+            currentRoom.enemies.forEach(enemy => {
+                if (enemy.hp <= 0) return;
+                
+                // Rectangle collision bounds for attack slash arc vs enemy
+                if (slashX < enemy.x + enemy.w &&
+                    slashX + slashW > enemy.x &&
+                    slashY < enemy.y + enemy.h &&
+                    slashY + slashH > enemy.y) {
+                    
+                    // Damage Enemy
+                    enemy.hp--;
+                    enemy.damageFlash = 8; // flash count frames
+                    
+                    // Push-back
+                    if (enemy.type !== "boss") {
+                        enemy.x += player.facingDir * 15;
+                    }
+
+                    playSound("hit");
+                    createExplosion(enemy.x + enemy.w/2, enemy.y + enemy.h/2, COLORS.enemyScrap, 8);
+                    game.screenShake = 6;
+
+                    // Handle Boss Trigger
+                    if (enemy.type === "boss" && enemy.attackState === "sleep") {
+                        enemy.attackState = "active";
+                        showAlert("CORE SECURITY DETECTED", "Cyber-Keeper Defense Robot Active!");
+                    }
+
+                    // Gardener boss awakening
+                    if (enemy.type === "gardener" && enemy.attackState === "sleep") {
+                        enemy.attackState = "active";
+                        showAlert("THE GARDENER AWAKENS", "An ancient plant-machine hybrid — guardian of the gate!");
+                    }
+                    // Gardener rage mode at half HP
+                    if (enemy.type === "gardener" && !enemy.rageMode && enemy.hp <= Math.ceil(enemy.maxHp / 2)) {
+                        enemy.rageMode = true;
+                        showAlert("THE GARDENER RAGES", "Root systems overloaded — thorn fire intensified!");
+                        game.screenShake = 12;
+                        createExplosion(enemy.x + enemy.w/2, enemy.y, COLORS.flora, 20);
+                        enemy.attackState = "spores";
+                        enemy.timer = 0;
+                    }
+
+                    // Enemy death check
+                    if (enemy.hp <= 0) {
+                        playSound("explosion");
+                        createExplosion(enemy.x + enemy.w/2, enemy.y + enemy.h/2, COLORS.floraLight, 25);
+                        game.screenShake = 12;
+                        
+                        // Victory if Boss is destroyed
+                        if (enemy.type === "boss") {
+                            game.victory = true;
+                            endGame(true);
+                        }
+
+                        // Gardener defeated — open the gate
+                        if (enemy.type === "gardener") {
+                            const gRoom = worldMap[0][3];
+                            if (gRoom.gardenerGate) gRoom.gardenerGate.active = false;
+                            showAlert("THE GARDENER DEFEATED", "The iron gate creaks open — the path to Sector Omega is clear!");
+                            createExplosion(ROOM_WIDTH - 42, ROOM_HEIGHT / 2, COLORS.flora, 35);
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- HUD AND MINI-MAP MODAL HANDLERS ---
+        function updateHUD() {
+            // Update Health Points Bar UI
+            const hpBar = document.getElementById("hp-bar");
+            const hpText = document.getElementById("hp-text");
+            const hpPercent = (player.hp / player.maxHp) * 100;
+            hpBar.style.width = `${Math.max(0, hpPercent)}%`;
+            hpText.textContent = `${player.hp}/${player.maxHp}`;
+
+            // Sync unlocked items icons styling
+            const iconDJ = document.getElementById("icon-double-jump");
+            const iconDash = document.getElementById("icon-dash");
+            const iconWC = document.getElementById("icon-wall-climb");
+            const iconKey = document.getElementById("icon-boss-key");
+
+            const dashBtn = document.getElementById("btn-dash");
+
+            if (game.upgrades.doubleJump) iconDJ.classList.remove("opacity-20", "grayscale");
+            if (game.upgrades.dash) {
+                iconDash.classList.remove("opacity-20", "grayscale");
+                dashBtn.classList.remove("opacity-40");
+            }
+            if (game.upgrades.wallClimb) iconWC.classList.remove("opacity-20", "grayscale");
+            if (game.upgrades.bossKey) iconKey.classList.remove("opacity-20", "grayscale");
+
+            // Compute current explored progress percent
+            let totalPossible = 0;
+            let totalExplored = 0;
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    if (worldMap[r][c].exists) {
+                        totalPossible++;
+                        if (worldMap[r][c].explored) totalExplored++;
+                    }
+                }
+            }
+            document.getElementById("map-percent").textContent = `${Math.round((totalExplored / totalPossible) * 100)}%`;
+
+            // Active Sector label updates
+            const currentRoom = worldMap[game.currentRoomRow][game.currentRoomCol];
+            document.getElementById("sector-display").textContent = currentRoom.title;
+
+            // Refresh in-game minimap if visible
+            if (hudMapVisible) renderHudMap();
+        }
+
+        // --- CORE END OF GAME TERMINATION SCENE ---
+        function endGame(isVictory) {
+            game.running = false;
+            game.over = true;
+            
+            const title = document.getElementById("end-title");
+            const desc = document.getElementById("end-desc");
+            
+            if (isVictory) {
+                title.textContent = "WILD RECLAIMED";
+                title.className = "text-4xl md:text-6xl font-extrabold text-emerald-400 mb-2 drop-shadow-[0_4px_12px_rgba(52,211,153,0.4)]";
+                desc.textContent = "The ancient defense core has been neutralized. Vegetation and safe wildlife spread once again. Mission Success!";
+                playSound("powerup");
+            } else {
+                title.textContent = "SYSTEM OFFLINE";
+                title.className = "text-4xl md:text-6xl font-extrabold text-red-500 mb-2";
+                desc.textContent = "Nano flatlined out in the mechanical wastes. Connect your cores and try once more.";
+                playSound("explosion");
+            }
+            
+            gameOverScreen.classList.remove("hidden");
+            gameOverScreen.classList.add("flex");
+        }
+
+        // --- MODAL POPUPS & CLOSURES ---
+        const mapModal = document.getElementById("map-modal");
+        const btnToggleMap = document.getElementById("btn-map-toggle");
+        const btnCloseMap = document.getElementById("btn-close-map");
+
+        btnToggleMap.addEventListener("click", () => {
+            mapModal.classList.remove("hidden");
+            mapModal.classList.add("flex");
+            renderMiniMapCanvas();
+        });
+
+        btnCloseMap.addEventListener("click", () => {
+            mapModal.classList.add("hidden");
+            mapModal.classList.remove("flex");
+        });
+
+        // --- MOBILE TOUCH LISTENERS ---
+        // Prevents ghost clicks on mobiles by binding virtual touch inputs
+        const touchBtns = [
+            { id: "btn-left", action: () => { keys["a"] = true; keys["arrowleft"] = true; }, release: () => { keys["a"] = false; keys["arrowleft"] = false; } },
+            { id: "btn-right", action: () => { keys["d"] = true; keys["arrowright"] = true; }, release: () => { keys["d"] = false; keys["arrowright"] = false; } },
+            { id: "btn-down", action: () => { keys["s"] = true; keys["arrowdown"] = true; }, release: () => { keys["s"] = false; keys["arrowdown"] = false; } },
+            { id: "btn-jump", action: () => { triggerJump(); }, release: null },
+            { id: "btn-dash", action: () => { triggerDash(); }, release: null },
+            { id: "btn-attack", action: () => { triggerAttack(); }, release: null }
+        ];
+
+        touchBtns.forEach(btnObj => {
+            const el = document.getElementById(btnObj.id);
+            if (!el) return;
+
+            el.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                btnObj.action();
+            }, { passive: false });
+
+            if (btnObj.release) {
+                el.addEventListener("touchend", (e) => {
+                    e.preventDefault();
+                    btnObj.release();
+                }, { passive: false });
+                el.addEventListener("touchcancel", (e) => {
+                    e.preventDefault();
+                    btnObj.release();
+                }, { passive: false });
+            }
+        });
+
+
+        // --- MAIN CANVAS GRAPHICS ENGINE ---
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Scale setup based on screen ratios
+        function resizeCanvas() {
+            canvas.width = ROOM_WIDTH;
+            canvas.height = ROOM_HEIGHT;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        // Mini-map drawing functions
+        const mapCanvas = document.getElementById("miniMapCanvas");
+        const mCtx = mapCanvas.getContext("2d");
+
+        function renderMiniMapCanvas() {
+            mapCanvas.width = 300;
+            mapCanvas.height = 180;
+            
+            const cellW = 50;
+            const cellH = 35;
+            const gap = 6;
+            
+            const offsetX = (mapCanvas.width - (MAP_COLS * (cellW + gap))) / 2;
+            const offsetY = (mapCanvas.height - (MAP_ROWS * (cellH + gap))) / 2;
+
+            mCtx.fillStyle = COLORS.bgDark;
+            mCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    const room = worldMap[r][c];
+                    if (!room.exists) continue;
+
+                    const x = offsetX + c * (cellW + gap);
+                    const y = offsetY + r * (cellH + gap);
+
+                    if (room.explored) {
+                        // Background base
+                        mCtx.fillStyle = (r === game.currentRoomRow && c === game.currentRoomCol) ? "#10b981" : "#1e293b";
+                        mCtx.fillRect(x, y, cellW, cellH);
+                        
+                        // Door links indicators
+                        mCtx.strokeStyle = "#475569";
+                        mCtx.lineWidth = 2;
+                        mCtx.strokeRect(x, y, cellW, cellH);
+
+                        if (room.doors.right) {
+                            mCtx.clearRect(x + cellW - 2, y + cellH/2 - 4, 4, 8);
+                        }
+                        if (room.doors.left) {
+                            mCtx.clearRect(x - 2, y + cellH/2 - 4, 4, 8);
+                        }
+                        if (room.doors.bottom) {
+                            mCtx.clearRect(x + cellW/2 - 4, y + cellH - 2, 8, 4);
+                        }
+                        if (room.doors.top) {
+                            mCtx.clearRect(x + cellW/2 - 4, y - 2, 8, 4);
+                        }
+
+                        // Specific Content Badges inside map grid
+                        if (room.hasUpgrade) {
+                            mCtx.fillStyle = "#f59e0b";
+                            mCtx.font = "8px monospace";
+                            mCtx.textAlign = "center";
+                            mCtx.fillText("⭐", x + cellW/2, y + cellH/2 + 3);
+                        } else if (room.isBossRoom) {
+                            mCtx.fillStyle = "#ef4444";
+                            mCtx.font = "bold 9px monospace";
+                            mCtx.textAlign = "center";
+                            mCtx.fillText("💀", x + cellW/2, y + cellH/2 + 3);
+                        } else if (r === game.currentRoomRow && c === game.currentRoomCol) {
+                            mCtx.fillStyle = "#ffffff";
+                            mCtx.font = "bold 8px monospace";
+                            mCtx.textAlign = "center";
+                            mCtx.fillText("🐱", x + cellW/2, y + cellH/2 + 3);
+                        }
+                    } else {
+                        // Dark fog of war cell
+                        mCtx.fillStyle = "#0c0d12";
+                        mCtx.fillRect(x, y, cellW, cellH);
+                        mCtx.strokeStyle = "#1a1b24";
+                        mCtx.lineWidth = 1;
+                        mCtx.strokeRect(x, y, cellW, cellH);
+                    }
+                }
+            }
+        }
+
+
+        // --- UPDATE WORLD FRAME & ENTITIES ---
+        function updateGame() {
+            if (!game.running || game.over) return;
+
+            const currentRoom = worldMap[game.currentRoomRow][game.currentRoomCol];
+
+            // 1. TIMERS AND INPUT LOGIC
+            if (player.invulnTimer > 0) player.invulnTimer--;
+            if (player.knockbackTimer > 0) player.knockbackTimer--;
+            if (player.dashCooldown > 0) player.dashCooldown--;
+            
+            if (player.attackTimer > 0) {
+                player.attackTimer--;
+                if (player.attackTimer === 0) {
+                    player.isAttacking = false;
+                }
+            }
+
+            // Screen shake dampening
+            if (game.screenShake > 0) {
+                game.screenShake *= 0.9;
+                if (game.screenShake < 0.2) game.screenShake = 0;
+            }
+
+            // Dashing Mechanics
+            if (player.isDashing) {
+                player.vx = player.dashDir * player.dashSpeed;
+                player.vy = 0; // Lock gravity during active dash frames
+                player.dashTimer--;
+                
+                // Spawn beautiful glowing trail particles
+                createTraceParticles(player.x + Math.random()*player.w, player.y + Math.random()*player.h, COLORS.dashGlow);
+
+                if (player.dashTimer <= 0) {
+                    player.isDashing = false;
+                    player.vx = player.dashDir * player.speed * 0.7; // bleed dash speed out
+                }
+            } else if (player.knockbackTimer === 0) {
+                // NORMAL MOVEMENT CONTROL
+                let moveX = 0;
+                if (keys["a"] || keys["arrowleft"]) {
+                    moveX = -1;
+                    player.facingDir = -1;
+                    player.dashDir = -1;
+                } else if (keys["d"] || keys["arrowright"]) {
+                    moveX = 1;
+                    player.facingDir = 1;
+                    player.dashDir = 1;
+                }
+
+                // Smoothly accelerate player
+                player.vx += moveX * 0.6; // Snappier horizontal acceleration
+                player.vx *= player.friction; // apply surface resistance
+                
+                // Limit maximum running speed
+                if (Math.abs(player.vx) > player.speed) {
+                    player.vx = Math.sign(player.vx) * player.speed;
+                }
+
+                // CROUCH LOGIC
+                const wantCrouch = (keys["s"] || keys["arrowdown"]) && player.grounded;
+                if (wantCrouch && !player.isCrouching) {
+                    player.isCrouching = true;
+                    player.y += (player.normalH - player.crouchH); // Shift down so feet stay grounded
+                    player.h = player.crouchH;
+                    player.vx *= 0.5; // Slow while crouching
+                } else if (!wantCrouch && player.isCrouching) {
+                    // Only stand up if there is room (check ceiling above)
+                    const headY = player.y - (player.normalH - player.crouchH);
+                    let blocked = false;
+                    currentRoom.platforms.forEach(p => {
+                        if (p.type === "hazard") return;
+                        if (player.x + player.w > p.x && player.x < p.x + p.w &&
+                            headY < p.y + p.h && player.y > p.y) {
+                            blocked = true;
+                        }
+                    });
+                    if (!blocked) {
+                        player.y -= (player.normalH - player.crouchH);
+                        player.h = player.normalH;
+                        player.isCrouching = false;
+                    }
+                }
+                if (player.isCrouching) {
+                    player.vx *= 0.8; // Extra friction while crouching
+                }
+
+                // Run visual walk cycles
+                if (Math.abs(player.vx) > 0.15 && player.grounded) {
+                    player.walkCycle += 0.25; // Adjusted animation speed to match new run speed
+                } else {
+                    player.walkCycle = 0;
+                }
+
+                // Apply gravity
+                player.vy += player.gravity;
+                if (player.vy > 10.5) player.vy = 10.5; // Adjusted terminal velocity for high jumps
+            } else {
+                // Knocked back state - bleed control but suffer gravity
+                player.vx *= 0.95;
+                player.vy += player.gravity;
+            }
+
+            // 2. WALL CLIMB/SLIDE LOGIC
+            let canWallClimbNow = false;
+            if (game.upgrades.wallClimb && !player.grounded && !player.isDashing) {
+                // Check if tight against vertical boundaries
+                const touchingLeftWall = player.x <= 35;
+                const touchingRightWall = player.x + player.w >= ROOM_WIDTH - 35;
+                
+                // Or colliding against a level platform designed as a vertical obstacle
+                let onInteriorWall = null;
+                currentRoom.platforms.forEach(p => {
+                    if (p.type === "wall" || p.type === "solid-block") {
+                        if (player.y + player.h > p.y && player.y < p.y + p.h) {
+                            if (Math.abs(player.x + player.w - p.x) < 5) onInteriorWall = "right";
+                            if (Math.abs(player.x - (p.x + p.w)) < 5) onInteriorWall = "left";
+                        }
+                    }
+                });
+
+                const directionClimbing = touchingLeftWall || onInteriorWall === "left" ? "left" : (touchingRightWall || onInteriorWall === "right" ? "right" : null);
+
+                if (directionClimbing) {
+                    player.climbingWall = directionClimbing;
+                    canWallClimbNow = true;
+                    // Slide down wall slow & steady
+                    if (player.vy > 0) player.vy = 0.85; 
+                    player.doubleJumpAvailable = true; // Refresh double-jump to climb higher!
+                }
+            }
+
+            if (!canWallClimbNow) {
+                player.climbingWall = null;
+            }
+
+            // Save previous values for robust resolution
+            const oldX = player.x;
+            const oldY = player.y;
+
+            // X-AXIS COLLISION RESOLUTION
+            player.x += player.vx;
+            resolvePlatformCollisions(currentRoom.platforms, "x", oldX);
+
+            // Y-AXIS COLLISION RESOLUTION
+            player.y += player.vy;
+            player.grounded = false;
+            resolvePlatformCollisions(currentRoom.platforms, "y", oldY);
+
+            // 3. HAZARD (SPIKE) ADVANCED COLLISION RESOLUTION
+            // Nano can now fall onto spikes mid-air and trigger solid impact, recoil, and damage immediately!
+            currentRoom.platforms.forEach(p => {
+                if (p.type === "hazard") {
+                    // Standard Axis-Aligned Bounding Box (AABB) intersection check
+                    if (player.x + player.w > p.x && player.x < p.x + p.w &&
+                        player.y + player.h > p.y && player.y < p.y + p.h) {
+                        
+                        damagePlayer(1);
+                        
+                        // Powerfully repel Nano up and outward from center of spike block
+                        player.vy = -7.5; 
+                        player.vx = (player.x + player.w / 2 < p.x + p.w / 2) ? -3.5 : 3.5;
+                        player.knockbackTimer = 15;
+                        player.grounded = false;
+                        
+                        createExplosion(player.x + player.w / 2, player.y + player.h / 2, COLORS.hazard, 8);
+                    }
+                }
+            });
+
+            // 3b. GARDENER GATE SOLID COLLISION
+            if (currentRoom.gardenerGate && currentRoom.gardenerGate.active) {
+                const gate = currentRoom.gardenerGate;
+                if (player.x + player.w > gate.x && player.x < gate.x + gate.w &&
+                    player.y + player.h > gate.y && player.y < gate.y + gate.h) {
+                    // Push player back (solid wall)
+                    if (player.vx > 0) {
+                        player.x = gate.x - player.w;
+                        player.vx = 0;
+                    }
+                }
+            }
+
+            // 4. HAZARD LASER BARRIERS OR KEYPAD BARRIER
+            if (currentRoom.barrierLaser && currentRoom.barrierLaser.active) {
+                const b = currentRoom.barrierLaser;
+                if (player.x + player.w > b.x && player.x < b.x + b.w &&
+                    player.y + player.h > b.y && player.y < b.y + b.h) {
+                    
+                    if (game.upgrades.bossKey) {
+                        b.active = false;
+                        playSound("powerup");
+                        showAlert("SECURITY RE-ROUTE", "The Access Core Key Card worked! Barrier deactivated.");
+                        createExplosion(b.x + 15, b.y + 30, COLORS.floraLight, 30);
+                    } else {
+                        // Dealt damage
+                        damagePlayer(1);
+                        player.vx = -4; // knock back
+                        player.x -= 10;
+                        showAlert("CORE LOCK ENFORCED", "A high energy field blocks access. Locate Security Key Card!");
+                    }
+                }
+            }
+
+            // 5. TRANSITIONAL ROOM BOUNDARY CROSSING
+            checkRoomTransition();
+
+            // 6. SECTOR UPGRADE POWERUPS COLLECTION
+            if (currentRoom.hasUpgrade) {
+                const upgX = ROOM_WIDTH / 2 - 15;
+                const upgY = ROOM_HEIGHT / 2 - 40;
+                
+                // Check if feline collides with glowing core
+                if (player.x + player.w > upgX && player.x < upgX + 30 &&
+                    player.y + player.h > upgY && player.y < upgY + 30) {
+                    
+                    const uType = currentRoom.hasUpgrade;
+                    
+                    if (uType === "double-jump") {
+                        game.upgrades.doubleJump = true;
+                        showAlert("SYSTEM INTEGRATED: DOUBLE JUMP", "Execute a mid-air jump using JUMP key twice.");
+                    } else if (uType === "dash") {
+                        game.upgrades.dash = true;
+                        showAlert("SYSTEM INTEGRATED: CYBER DASH", "Trigger lightning dash with K key.");
+                    } else if (uType === "bossKey") {
+                        game.upgrades.bossKey = true;
+                        showAlert("ACCESS KEY RECEIVED", "Secured Sector Omega Core Lab Authorization Card!");
+                    } else if (uType === "health-core") {
+                        player.maxHp = 4;
+                        player.hp = 4;
+                        showAlert("CHASSIS RE-ENFORCED", "Acquired Nano Health Overcharger. Cores updated!");
+                    }
+
+                    playSound("powerup");
+                    createExplosion(upgX + 15, upgY + 15, COLORS.player, 40);
+                    currentRoom.hasUpgrade = null; // Clean upgrade from room forever
+                    updateHUD();
+                }
+            }
+
+            // 7. ENEMY SIMULATION AI ENGINE
+            currentRoom.enemies.forEach(enemy => {
+                if (enemy.hp <= 0) return;
+
+                // Simple Visual Damage Flash counting
+                if (enemy.damageFlash > 0) enemy.damageFlash--;
+
+                // AI behaviors depending on sub-class
+                if (enemy.type === "patrol") {
+                    enemy.x += enemy.vx * enemy.dir;
+                    if (enemy.x <= enemy.startX || enemy.x + enemy.w >= enemy.endX) {
+                        enemy.dir *= -1; // bounce
+                    }
+                    
+                    // PREDICTABLE PATTERN SHOOTING: Fires exactly once every 140 frames (approx 2.3 seconds)
+                    if (enemy.shootTimer === undefined) enemy.shootTimer = 0;
+                    enemy.shootTimer++;
+                    if (enemy.shootTimer >= 140) {
+                        enemy.shootTimer = 0;
+                        // Predictable horizontal bullet aimed in player's current direction
+                        const bulletDir = (player.x + player.w / 2 < enemy.x + enemy.w / 2) ? -1 : 1;
+                        shootProjectile(enemy.x + enemy.w / 2, enemy.y + enemy.h / 2, bulletDir * 3, 0);
+                    }
+                } else if (enemy.type === "charger") {
+                    // Charger AI: Patrolling and charges when player in line of sight
+                    if (enemy.state === "idle") {
+                        enemy.timer++;
+                        if (enemy.timer > 60) {
+                            enemy.state = "charge";
+                            enemy.timer = 0;
+                            // Target player's current side
+                            enemy.vx = (player.x < enemy.x) ? -3.5 : 3.5;
+                        }
+                    } else if (enemy.state === "charge") {
+                        enemy.x += enemy.vx;
+                        // Bounce at walls
+                        if (enemy.x <= 40 || enemy.x + enemy.w >= ROOM_WIDTH - 40) {
+                            enemy.state = "idle";
+                            enemy.timer = 0;
+                            enemy.vx = 0;
+                            playSound("hit");
+                            game.screenShake = 3;
+                        }
+                    }
+                } else if (enemy.type === "jumper") {
+                    enemy.timer++;
+                    if (enemy.timer > 80 && Math.abs(player.x - enemy.x) < 300) {
+                        enemy.timer = 0;
+                        // Jump toward player
+                        enemy.vy = -7.5;
+                        enemy.vx = (player.x < enemy.x) ? -2.2 : 2.2;
+                    }
+
+                    // Physics for jumper
+                    enemy.vy += 0.35;
+                    enemy.y += enemy.vy;
+                    enemy.x += enemy.vx;
+
+                    // Ground clamp
+                    if (enemy.y >= ROOM_HEIGHT - 65) {
+                        enemy.y = ROOM_HEIGHT - 65;
+                        enemy.vy = 0;
+                        enemy.vx = 0;
+                    }
+                } else if (enemy.type === "boss") {
+                    simulateBoss(enemy);
+                } else if (enemy.type === "gardener") {
+                    simulateGardener(enemy);
+                }
+
+                // Check collision of enemy vs Player
+                if (player.x < enemy.x + enemy.w &&
+                    player.x + player.w > enemy.x &&
+                    player.y < enemy.y + enemy.h &&
+                    player.y + player.h > enemy.y) {
+                    
+                    damagePlayer(1);
+                    // Knock back player away from enemy
+                    player.knockbackTimer = 15;
+                    player.vx = (player.x < enemy.x ? -1 : 1) * 6;
+                    player.vy = -3;
+                }
+            });
+
+            // 8. PROJECTILE PHYSICS SIMULATIONS
+            for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
+                const proj = enemyProjectiles[i];
+                proj.x += proj.vx;
+                proj.y += proj.vy;
+                proj.life--;
+
+                // Collide with platforms
+                let hitPlatform = false;
+                currentRoom.platforms.forEach(p => {
+                    if (proj.x > p.x && proj.x < p.x + p.w && proj.y > p.y && proj.y < p.y + p.h) {
+                        hitPlatform = true;
+                    }
+                });
+
+                // Collide with player
+                if (!hitPlatform &&
+                    proj.x > player.x && proj.x < player.x + player.w &&
+                    proj.y > player.y && proj.y < player.y + player.h) {
+                    
+                    damagePlayer(1);
+                    hitPlatform = true;
+                }
+
+                if (hitPlatform || proj.life <= 0) {
+                    createExplosion(proj.x, proj.y, COLORS.enemyScrap, 4);
+                    enemyProjectiles.splice(i, 1);
+                }
+            }
+
+            // 9. PARTICLES LIFE CYCLE
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= p.decay;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Projectile Spawner
+        function shootProjectile(x, y, vx, vy) {
+            playSound("laser");
+            enemyProjectiles.push({
+                x, y, vx, vy,
+                life: 180, // Frame count expiration
+                w: 8, h: 8
+            });
+        }
+
+        // --- DEFENSE KEEPER TITAN BOSS LOGIC ---
+        function simulateBoss(boss) {
+            if (boss.attackState === "sleep") {
+                return; // Sleep until woke up by attack
+            }
+
+            boss.timer++;
+
+            // Simple state machine cycle
+            if (boss.attackState === "active") {
+                // Move slowly left/right
+                boss.x += boss.vx * boss.dir;
+                if (boss.x < 150 || boss.x + boss.w > ROOM_WIDTH - 150) {
+                    boss.dir *= -1;
+                }
+
+                // Randomly trigger laser fire or smash
+                if (boss.timer > 100) {
+                    boss.timer = 0;
+                    const choice = Math.random();
+                    if (choice < 0.5) {
+                        boss.attackState = "lasers";
+                    } else {
+                        boss.attackState = "smash";
+                        boss.vy = -8; // leap up
+                    }
+                }
+            } else if (boss.attackState === "lasers") {
+                // Pattern-based lasers at the cat
+                if (boss.timer % 14 === 0) {
+                    const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+                    const vx = Math.cos(angle) * 4.5;
+                    const vy = Math.sin(angle) * 4.5;
+                    shootProjectile(boss.x + boss.w/2, boss.y + 40, vx, vy);
+                }
+
+                if (boss.timer > 120) {
+                    boss.timer = 0;
+                    boss.attackState = "active";
+                }
+            } else if (boss.attackState === "smash") {
+                // Jumps up and smashes ground sending horizontal shock waves
+                boss.vy += 0.3; // Gravity for giant
+                boss.y += boss.vy;
+
+                // Move horizontally slightly toward player while falling
+                boss.x += (player.x < boss.x ? -1 : 1) * 1.5;
+
+                // Hit ground
+                if (boss.y >= ROOM_HEIGHT - 135) {
+                    boss.y = ROOM_HEIGHT - 135;
+                    boss.vy = 0;
+                    boss.attackState = "active";
+                    boss.timer = 0;
+
+                    // Play audio effect & screen rumble
+                    playSound("explosion");
+                    game.screenShake = 16;
+                    
+                    // Fire side shockwaves across bottom floor
+                    shootProjectile(boss.x, ROOM_HEIGHT - 50, -4, 0);
+                    shootProjectile(boss.x + boss.w, ROOM_HEIGHT - 50, 4, 0);
+                    
+                    // Create massive dirt impact debris
+                    createExplosion(boss.x + boss.w/2, ROOM_HEIGHT - 40, COLORS.wall, 16);
+                }
+            }
+        }
+
+        // --- THE GARDENER MINI-BOSS LOGIC ---
+        function simulateGardener(boss) {
+            if (boss.attackState === "sleep") return;
+
+            boss.timer++;
+            const rage = boss.rageMode;
+
+            if (boss.attackState === "active") {
+                // Pace back and forth across the right side of the room
+                boss.x += boss.vx * boss.dir * (rage ? 1.6 : 1);
+                const leftBound = rage ? 300 : 480;
+                if (boss.x < leftBound || boss.x + boss.w > ROOM_WIDTH - 55) {
+                    boss.dir *= -1;
+                }
+
+                // Shoot thorn spores toward player periodically
+                boss.vineShotTimer++;
+                const shootInterval = rage ? 40 : 70;
+                if (boss.vineShotTimer >= shootInterval) {
+                    boss.vineShotTimer = 0;
+                    const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+                    shootProjectile(boss.x + boss.w/2, boss.y + 30,
+                        Math.cos(angle) * (rage ? 5.5 : 3.8),
+                        Math.sin(angle) * (rage ? 5.5 : 3.8));
+                    // In rage mode fire 2 extra spread shots
+                    if (rage) {
+                        shootProjectile(boss.x + boss.w/2, boss.y + 30,
+                            Math.cos(angle + 0.35) * 4.5, Math.sin(angle + 0.35) * 4.5);
+                        shootProjectile(boss.x + boss.w/2, boss.y + 30,
+                            Math.cos(angle - 0.35) * 4.5, Math.sin(angle - 0.35) * 4.5);
+                    }
+                }
+
+                // Switch to vine attack periodically
+                if (boss.timer > (rage ? 60 : 100)) {
+                    boss.timer = 0;
+                    if (Math.random() < 0.5) {
+                        boss.attackState = "vines";
+                    }
+                }
+            } else if (boss.attackState === "vines") {
+                // Rapidly fire vine thorns in burst pattern
+                if (boss.timer % 8 === 0 && boss.timer <= 48) {
+                    const angle = Math.atan2(player.y - boss.y, player.x - boss.x);
+                    const spread = (boss.timer / 8 - 3) * 0.2;
+                    shootProjectile(boss.x + boss.w/2, boss.y + 40,
+                        Math.cos(angle + spread) * 4,
+                        Math.sin(angle + spread) * 4);
+                }
+                if (boss.timer > 55) {
+                    boss.timer = 0;
+                    boss.attackState = "active";
+                }
+            } else if (boss.attackState === "spores") {
+                // Scatter 5 spores in all directions
+                if (boss.timer === 1) {
+                    for (let i = 0; i < 5; i++) {
+                        const a = (i / 5) * Math.PI * 2;
+                        shootProjectile(boss.x + boss.w/2, boss.y + 40,
+                            Math.cos(a) * 3.5, Math.sin(a) * 3.5);
+                    }
+                    playSound("explosion");
+                    game.screenShake = 6;
+                }
+                if (boss.timer > 30) {
+                    boss.timer = 0;
+                    boss.attackState = "active";
+                }
+            }
+        }
+        function resolvePlatformCollisions(platforms, axis, oldVal) {
+            platforms.forEach(p => {
+                if (p.type === "hazard") return; // Hazard is handled as soft trigger bounds
+
+                // Check bounds intersection
+                if (player.x + player.w > p.x &&
+                    player.x < p.x + p.w &&
+                    player.y + player.h > p.y &&
+                    player.y < p.y + p.h) {
+                    
+                    if (axis === "x") {
+                        // Restore old X position
+                        player.x = oldVal;
+                        player.vx = 0;
+                    } else if (axis === "y") {
+                        // Restore old Y position
+                        player.y = oldVal;
+                        
+                        if (player.vy > 0) {
+                            // Hit top of platform (grounded)
+                            player.grounded = true;
+                            player.doubleJumpAvailable = true; // Refresh double jump
+                            player.dashAvailable = true;       // Refresh dash
+                            player.vy = 0;
+                        } else if (player.vy < 0) {
+                            // Hit ceiling block from below
+                            player.vy = 0.5; // gentle fall back
+                        }
+                    }
+                }
+            });
+        }
+
+        // --- ROOM CHANGE & FOG REVEALS ---
+        function checkRoomTransition() {
+            let row = game.currentRoomRow;
+            let col = game.currentRoomCol;
+            let transitioned = false;
+
+            // Transited right boundary - slightly wider trigger threshold
+            if (player.x > ROOM_WIDTH - player.w - 5 && col < MAP_COLS - 1 && worldMap[row][col].doors.right) {
+                // Block transition if gardener gate is active in this room
+                const curRm = worldMap[row][col];
+                if (curRm.gardenerGate && curRm.gardenerGate.active) {
+                    // Gate blocks the path — do nothing
+                } else {
+                    game.currentRoomCol++;
+                    player.x = 40;
+                    transitioned = true;
+                }
+            }
+            // Transited left boundary - slightly wider trigger threshold
+            else if (player.x < 5 && col > 0 && worldMap[row][col].doors.left) {
+                game.currentRoomCol--;
+                player.x = ROOM_WIDTH - player.w - 40;
+                transitioned = true;
+            }
+            // Transited bottom boundary (falling into pits)
+            else if (player.y > ROOM_HEIGHT - player.h - 5 && row < MAP_ROWS - 1 && worldMap[row][col].doors.bottom) {
+                game.currentRoomRow++;
+                player.y = 35; // Spawn at top
+                transitioned = true;
+            }
+            // Transited top boundary (climbing/jumping up)
+            else if (player.y < 5 && row > 0 && worldMap[row][col].doors.top) {
+                game.currentRoomRow--;
+                player.y = ROOM_HEIGHT - player.h - 35;
+                transitioned = true;
+            }
+
+            // UPDATE REFERENCE TO CURRENT SECTOR
+            row = game.currentRoomRow;
+            col = game.currentRoomCol;
+
+            // CLAMPING RULES: Only stop the player from going off-screen if there is NO open door on that side!
+            if (!worldMap[row][col].doors.left && player.x < 30) {
+                player.x = 30;
+                player.vx = 0;
+            }
+            if (!worldMap[row][col].doors.right && player.x > ROOM_WIDTH - player.w - 30) {
+                player.x = ROOM_WIDTH - player.w - 30;
+                player.vx = 0;
+            }
+            if (!worldMap[row][col].doors.top && player.y < 25) {
+                player.y = 25;
+                player.vy = 0;
+            }
+            if (!worldMap[row][col].doors.bottom && player.y > ROOM_HEIGHT - player.h - 35) {
+                player.y = ROOM_HEIGHT - player.h - 35;
+                player.vy = 0;
+                player.grounded = true;
+                player.doubleJumpAvailable = true;
+                player.dashAvailable = true;
+            }
+
+            if (transitioned) {
+                // Clear active projectiles to avoid cross room ghosts
+                enemyProjectiles = [];
+                
+                // Mark exploration progress
+                const newRoom = worldMap[game.currentRoomRow][game.currentRoomCol];
+                if (!newRoom.explored) {
+                    newRoom.explored = true;
+                    game.discoveredSectors++;
+                }
+                
+                updateHUD();
+                
+                // Show transitional notification brief Alert
+                showAlert(newRoom.title, "Sector scanned. Watch out for patrolling core guards.");
+                
+                // Refresh Double Jump and Dash
+                player.doubleJumpAvailable = true;
+                player.dashAvailable = true;
+            }
+        }
+
+        // --- COMBAT CORE: DAMAGE CALCULATOR ---
+        function damagePlayer(amt) {
+            if (player.invulnTimer > 0 || !game.running || game.over) return;
+
+            player.hp -= amt;
+            player.invulnTimer = 45; // invulnerability frames duration
+            playSound("hit");
+            game.screenShake = 14;
+            createExplosion(player.x + 15, player.y + 10, "#f43f5e", 15);
+            updateHUD();
+
+            if (player.hp <= 0) {
+                endGame(false);
+            }
+        }
+
+        // --- MAIN CANVAS RENDERING LOOP ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Apply camera offsets from screen-shakes
+            ctx.save();
+            if (game.screenShake > 0) {
+                const shakeX = (Math.random() - 0.5) * game.screenShake;
+                const shakeY = (Math.random() - 0.5) * game.screenShake;
+                ctx.translate(shakeX, shakeY);
+            }
+
+            const currentRoom = worldMap[game.currentRoomRow][game.currentRoomCol];
+
+            // 1. DRAW BACKGROUND PARALLAX/GRID DECORATIONS
+            ctx.fillStyle = COLORS.bg;
+            ctx.fillRect(0, 0, ROOM_WIDTH, ROOM_HEIGHT);
+
+            ctx.strokeStyle = COLORS.gridLine;
+            ctx.lineWidth = 1;
+            const gridSz = 40;
+            for (let x = 0; x < ROOM_WIDTH; x += gridSz) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, ROOM_HEIGHT);
+                ctx.stroke();
+            }
+            for (let y = 0; y < ROOM_HEIGHT; y += gridSz) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(ROOM_WIDTH, y);
+                ctx.stroke();
+            }
+
+            // Draw post-apocalyptic overgrown foliage decorations in background
+            ctx.fillStyle = "rgba(16, 185, 129, 0.12)";
+            ctx.beginPath();
+            ctx.arc(100, ROOM_HEIGHT - 35, 60, Math.PI, 0);
+            ctx.arc(280, ROOM_HEIGHT - 35, 90, Math.PI, 0);
+            ctx.arc(650, ROOM_HEIGHT - 35, 75, Math.PI, 0);
+            ctx.fill();
+
+            // Decorative pillars
+            ctx.fillStyle = "rgba(30, 41, 59, 0.3)";
+            ctx.fillRect(150, 0, 45, ROOM_HEIGHT);
+            ctx.fillRect(520, 0, 60, ROOM_HEIGHT);
+
+            // 2. DRAW ROOM PLATFORMS, WALLS & HAZARDS
+            currentRoom.platforms.forEach(p => {
+                if (p.type === "hazard") {
+                    // Draw red glowing security spikes
+                    ctx.fillStyle = COLORS.hazard;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    
+                    // Draw repeating sharp spikes with inline triangle canvas paths
+                    ctx.strokeStyle = "#ef4444";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    for (let spX = p.x; spX < p.x + p.w; spX += 10) {
+                        ctx.moveTo(spX, p.y + p.h);
+                        ctx.lineTo(spX + 5, p.y);
+                        ctx.lineTo(spX + 10, p.y + p.h);
+                    }
+                    ctx.stroke();
+                } else if (p.type === "ledge") {
+                    // Overgrown moss platforms
+                    ctx.fillStyle = COLORS.ledge;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    
+                    // Green mossy cap line on top
+                    ctx.fillStyle = COLORS.flora;
+                    ctx.fillRect(p.x, p.y, p.w, 4);
+                } else {
+                    // Solid ground or steel walls
+                    ctx.fillStyle = COLORS.wallDark;
+                    ctx.fillRect(p.x, p.y, p.w, p.h);
+                    
+                    // Inner iron plate border design
+                    ctx.strokeStyle = COLORS.wall;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(p.x + 2, p.y + 2, p.w - 4, p.h - 4);
+                }
+            });
+
+            // Draw laser barrier block (if present and active)
+            if (currentRoom.barrierLaser && currentRoom.barrierLaser.active) {
+                const b = currentRoom.barrierLaser;
+                // Draw warning post/emitters
+                ctx.fillStyle = "#475569";
+                ctx.fillRect(b.x - 4, b.y, 6, b.h);
+                ctx.fillRect(b.x + b.w - 2, b.y, 6, b.h);
+
+                // Flickering neon laser filling
+                const opacity = 0.6 + Math.sin(Date.now() / 30) * 0.3;
+                ctx.fillStyle = `rgba(239, 68, 68, ${opacity})`;
+                ctx.fillRect(b.x, b.y + 5, b.w, b.h - 10);
+                
+                // Electric white core lines
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(b.x + b.w/2, b.y + 5);
+                ctx.lineTo(b.x + b.w/2, b.y + b.h - 5);
+                ctx.stroke();
+            }
+
+            // 3. DRAW ROOM UPGRADE CORES (ITEMS SECTORS)
+            if (currentRoom.hasUpgrade) {
+                const upgX = ROOM_WIDTH / 2;
+                const upgY = ROOM_HEIGHT / 2 - 25;
+                const pulse = Math.sin(Date.now() / 150) * 8;
+
+                // Pulsing outer halo aura
+                ctx.fillStyle = "rgba(245, 158, 11, 0.2)";
+                ctx.beginPath();
+                ctx.arc(upgX, upgY, 28 + pulse, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Core item drawing
+                ctx.fillStyle = COLORS.player;
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(upgX, upgY, 14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Custom badge markings on items
+                ctx.fillStyle = "#0c0d12";
+                ctx.font = "bold 11px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                
+                let iconChar = "⭐";
+                if (currentRoom.hasUpgrade === "double-jump") iconChar = "👟";
+                if (currentRoom.hasUpgrade === "dash") iconChar = "⚡";
+                if (currentRoom.hasUpgrade === "bossKey") iconChar = "🔑";
+                if (currentRoom.hasUpgrade === "health-core") iconChar = "❤️";
+                
+                ctx.fillText(iconChar, upgX, upgY);
+
+                // Base tech-pedestal
+                ctx.fillStyle = "#1e293b";
+                ctx.fillRect(upgX - 25, upgY + 22, 50, 45);
+                ctx.fillStyle = COLORS.flora;
+                ctx.fillRect(upgX - 25, upgY + 22, 50, 4);
+            }
+
+            // 4. DRAW ENEMIES
+            currentRoom.enemies.forEach(enemy => {
+                if (enemy.hp <= 0) return;
+
+                // Toggle flash colors on hit
+                if (enemy.damageFlash > 0 && Math.floor(enemy.damageFlash / 2) % 2 === 0) {
+                    ctx.fillStyle = "#ffffff";
+                } else {
+                    ctx.fillStyle = COLORS.enemyScrap;
+                }
+
+                // Render based on unique types
+                if (enemy.type === "patrol") {
+                    // Flying Cyber Drone shape
+                    ctx.beginPath();
+                    ctx.moveTo(enemy.x, enemy.y + 12);
+                    ctx.lineTo(enemy.x + 12, enemy.y);
+                    ctx.lineTo(enemy.x + 24, enemy.y + 12);
+                    ctx.lineTo(enemy.x + 12, enemy.y + 24);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // Glowing scanning laser eye
+                    ctx.fillStyle = "#00ffff";
+                    ctx.beginPath();
+                    ctx.arc(enemy.x + 12 + enemy.dir * 4, enemy.y + 12, 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Helicopter rotors spinning lines
+                    ctx.strokeStyle = "#64748b";
+                    ctx.lineWidth = 2;
+                    const propOffset = Math.sin(Date.now() / 20) * 8;
+                    ctx.beginPath();
+                    ctx.moveTo(enemy.x + 12 - propOffset, enemy.y - 3);
+                    ctx.lineTo(enemy.x + 12 + propOffset, enemy.y - 3);
+                    ctx.stroke();
+                } else if (enemy.type === "charger") {
+                    // Ground Spike-roller tank shape
+                    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+                    
+                    // Tank wheels
+                    ctx.fillStyle = "#0f172a";
+                    ctx.fillRect(enemy.x + 2, enemy.y + enemy.h - 6, 8, 8);
+                    ctx.fillRect(enemy.x + enemy.w - 10, enemy.y + enemy.h - 6, 8, 8);
+
+                    // Giant forward-facing spiked shield
+                    ctx.fillStyle = "#ef4444";
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    const spikeTipX = enemy.vx >= 0 ? enemy.x + enemy.w + 8 : enemy.x - 8;
+                    ctx.moveTo(enemy.x + enemy.w/2, enemy.y);
+                    ctx.lineTo(spikeTipX, enemy.y + enemy.h/2);
+                    ctx.lineTo(enemy.x + enemy.w/2, enemy.y + enemy.h);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (enemy.type === "jumper") {
+                    // Mechanical spring frog robot
+                    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+                    
+                    // Joint spring coils legs
+                    ctx.strokeStyle = "#94a3b8";
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.moveTo(enemy.x + 4, enemy.y + enemy.h);
+                    ctx.lineTo(enemy.x + 8, enemy.y + enemy.h + 5);
+                    ctx.moveTo(enemy.x + enemy.w - 4, enemy.y + enemy.h);
+                    ctx.lineTo(enemy.x + enemy.w - 8, enemy.y + enemy.h + 5);
+                    ctx.stroke();
+                } else if (enemy.type === "boss") {
+                    // Titan Cyber Core Boss Robot drawing
+                    ctx.fillRect(enemy.x, enemy.y, enemy.w, enemy.h);
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(enemy.x + 2, enemy.y + 2, enemy.w - 4, enemy.h - 4);
+
+                    // Giant singular glowing neon eye
+                    ctx.fillStyle = enemy.attackState === "sleep" ? "#334155" : (enemy.attackState === "lasers" ? "#ff00ff" : "#ef4444");
+                    ctx.beginPath();
+                    ctx.arc(enemy.x + enemy.w/2, enemy.y + 35, 18, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Eye pulse center
+                    ctx.fillStyle = "#ffffff";
+                    ctx.beginPath();
+                    ctx.arc(enemy.x + enemy.w/2, enemy.y + 35, 6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Mechanical support hydraulic wires/legs
+                    ctx.strokeStyle = "#3b4252";
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.moveTo(enemy.x + 15, enemy.y + enemy.h);
+                    ctx.lineTo(enemy.x - 10, enemy.y + enemy.h + 30);
+                    ctx.moveTo(enemy.x + enemy.w - 15, enemy.y + enemy.h);
+                    ctx.lineTo(enemy.x + enemy.w + 10, enemy.y + enemy.h + 30);
+                    ctx.stroke();
+
+                    // Draw boss HP bar on top
+                    if (enemy.attackState !== "sleep") {
+                        const barW = 200;
+                        const barX = (ROOM_WIDTH - barW) / 2;
+                        const barY = 45;
+                        ctx.fillStyle = "#1e293b";
+                        ctx.fillRect(barX, barY, barW, 10);
+                        
+                        const curHpW = (enemy.hp / enemy.maxHp) * barW;
+                        ctx.fillStyle = "#ef4444";
+                        ctx.fillRect(barX, barY, curHpW, 10);
+                        
+                        ctx.strokeStyle = "#475569";
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(barX, barY, barW, 10);
+
+                        ctx.fillStyle = "#ffffff";
+                        ctx.font = "bold 9px monospace";
+                        ctx.textAlign = "center";
+                        ctx.fillText("CYBER-KEEPER DEFENSE OVERSEER", ROOM_WIDTH/2, barY - 6);
+                    }
+                }
+            });
+
+            // 5. DRAW ENEMY PROJECTILES
+            enemyProjectiles.forEach(proj => {
+                ctx.fillStyle = "#f43f5e";
+                ctx.beginPath();
+                ctx.arc(proj.x, proj.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // inner white hot core
+                ctx.fillStyle = "#ffffff";
+                ctx.beginPath();
+                ctx.arc(proj.x, proj.y, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 6. DRAW PARTICLES
+            particles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.life;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0; // Restore alpha context
+
+            // 7. DRAW CYBER-CAT PLAYER (NANO)
+            // Blink when invulnerable after taking hits
+            if (player.invulnTimer === 0 || Math.floor(player.invulnTimer / 3) % 2 === 0) {
+                ctx.save();
+                ctx.translate(player.x + player.w/2, player.y + player.h/2);
+                if (player.facingDir === -1) {
+                    ctx.scale(-1, 1); // mirror horizontal alignment
+                }
+
+                const catW = player.w;
+                const catH = player.h;
+
+                // Main body shape
+                ctx.fillStyle = COLORS.player;
+                ctx.beginPath();
+                ctx.roundRect(-catW/2, -catH/2 + 3, catW, catH - 4, 6);
+                ctx.fill();
+
+                // Cybernetic glowing power strip on back
+                ctx.fillStyle = COLORS.floraLight;
+                ctx.fillRect(-catW/4, -catH/2 + 3, catW/2, 2.5);
+
+                // Cute Head
+                ctx.fillStyle = COLORS.player;
+                ctx.beginPath();
+                ctx.roundRect(catW/2 - 12, -catH/2 - 4, 14, 14, 4);
+                ctx.fill();
+
+                // Cat Pointy Ears
+                ctx.beginPath();
+                ctx.moveTo(catW/2 - 12, -catH/2 - 4);
+                ctx.lineTo(catW/2 - 14, -catH/2 - 12);
+                ctx.lineTo(catW/2 - 6, -catH/2 - 4);
+                ctx.moveTo(catW/2 - 4, -catH/2 - 4);
+                ctx.lineTo(catW/2 - 2, -catH/2 - 12);
+                ctx.lineTo(catW/2 + 2, -catH/2 - 4);
+                ctx.fill();
+
+                // Neon cyan feline eye
+                ctx.fillStyle = "#22d3ee";
+                ctx.beginPath();
+                ctx.arc(catW/2 - 3, -catH/2 + 1, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Little cyber paws (Walking animation displacement)
+                ctx.fillStyle = COLORS.playerCore;
+                const legDisplacement = Math.sin(player.walkCycle) * 3;
+                // Back leg
+                ctx.fillRect(-catW/2 + 3, catH/2 - 2, 5, 4);
+                // Front legs animated
+                ctx.fillRect(catW/2 - 9, catH/2 - 2 + legDisplacement, 5, 4);
+                ctx.fillRect(-catW/6 + legDisplacement, catH/2 - 2, 5, 4);
+
+                // Flickering cybernetic Tail
+                ctx.strokeStyle = COLORS.player;
+                ctx.lineWidth = 3;
+                ctx.lineCap = "round";
+                ctx.beginPath();
+                ctx.moveTo(-catW/2, catH/2 - 10);
+                const tailWobble = Math.sin(Date.now() / 120) * 6;
+                ctx.quadraticCurveTo(-catW/2 - 10, -10 + tailWobble, -catW/2 - 12, -15);
+                ctx.stroke();
+
+                // DRAW MELEE SLASH ATTACK SWIPE FRAME
+                if (player.isAttacking) {
+                    ctx.strokeStyle = "rgba(110, 231, 183, 0.8)";
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(catW/2, 0, 32, -Math.PI / 3, Math.PI / 3);
+                    ctx.stroke();
+
+                    // White hot arc core
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.arc(catW/2, 0, 30, -Math.PI / 4, Math.PI / 4);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            ctx.restore(); // restore screenshake translations
+        }
+
+        // --- MAIN GAME LOOP RUNNER ---
+        function loop() {
+            updateGame();
+            render();
+            requestAnimationFrame(loop);
+        }
+
+        // --- GAME READY START-UP HANDLER ---
+        window.onload = function() {
+            loop(); // Kick off engine frames drawing automatically
+            updateHUD();
+        };
+
+    </script>
+</body>
+</html>
